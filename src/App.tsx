@@ -5,11 +5,12 @@ import { TodoCard } from './components/TodoCard';
 import { ImprovModal } from './components/ImprovModal';
 import { BottomNav } from './components/BottomNav';
 import { FloatingActionButton } from './components/FloatingActionButton';
-import { CalendarView } from './components/CalendarView';
+import { CalendarView, formatLocalDateStr } from './components/CalendarView';
 import { NoteCard } from './components/NoteCard';
 import { NoteEditorModal } from './components/NoteEditorModal';
 import { IMPROV_PROMPTS } from './data/improvPrompts';
 import { Sparkles, Filter, Flame, Trophy, CheckCircle2, Zap, Clock, Plus, Calendar as CalendarIcon, FileText } from 'lucide-react';
+import { App as CapApp } from '@capacitor/app';
 
 const INITIAL_TODOS: Todo[] = [
   {
@@ -20,8 +21,8 @@ const INITIAL_TODOS: Todo[] = [
     priority: 'high',
     category: 'Recurring',
     createdAt: Date.now() - 3600000,
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 864000000).toISOString().split('T')[0],
+    startDate: formatLocalDateStr(new Date()),
+    endDate: formatLocalDateStr(new Date(Date.now() + 864000000)),
     selectedDays: [1, 3, 5],
     scheduleType: 'days'
   },
@@ -112,12 +113,12 @@ export function App() {
   
   // Date Scheduling Form State
   const [newScheduleType, setNewScheduleType] = useState<DateScheduleType>('single');
-  const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [newStartDate, setNewStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newDate, setNewDate] = useState(() => formatLocalDateStr(new Date()));
+  const [newStartDate, setNewStartDate] = useState(() => formatLocalDateStr(new Date()));
   const [newEndDate, setNewEndDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
+    return formatLocalDateStr(d);
   });
   const [newSelectedDays, setNewSelectedDays] = useState<number[]>([1, 3, 5]); // Mon, Wed, Fri
 
@@ -128,6 +129,50 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('improv_notes', JSON.stringify(notes));
   }, [notes]);
+
+  // Native Android Hardware Back Button Handler
+  useEffect(() => {
+    const handleBackButton = async () => {
+      // 1. Close Full-Screen Note Editor / New Note Editor
+      if (editingNote || isNoteEditorOpen) {
+        setEditingNote(null);
+        setIsNoteEditorOpen(false);
+        return;
+      }
+      // 2. Close Pop-up Modals
+      if (isAddModalOpen) {
+        setIsAddModalOpen(false);
+        return;
+      }
+      if (isImprovModalOpen) {
+        setIsImprovModalOpen(false);
+        return;
+      }
+      // 3. If on Tasks tab but in Recurring or Notes section -> Go back to Daily Tasks
+      if (activeTab === 'todos' && homeSection !== 'daily') {
+        setHomeSection('daily');
+        return;
+      }
+      // 4. If on Calendar, Improv Studio, or Stats tab -> Go back to Tasks tab
+      if (activeTab !== 'todos') {
+        setActiveTab('todos');
+        return;
+      }
+      // 5. If at the root (Tasks -> Daily), minimize app to background or exit
+      try {
+        await CapApp.minimizeApp();
+      } catch (e) {
+        try {
+          await CapApp.exitApp();
+        } catch (err) {}
+      }
+    };
+
+    const handle = CapApp.addListener('backButton', handleBackButton);
+    return () => {
+      handle.then(h => h.remove());
+    };
+  }, [isAddModalOpen, isImprovModalOpen, isNoteEditorOpen, editingNote, activeTab, homeSection]);
 
   const handleToggleTodo = (id: string) => {
     setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
@@ -538,7 +583,7 @@ export function App() {
                       priority: 'improv',
                       category: prompt.category,
                       isImprovPrompt: true,
-                      date: new Date().toISOString().split('T')[0],
+                      date: formatLocalDateStr(new Date()),
                       scheduleType: 'single'
                     })}
                     className="btn btn-secondary"
@@ -606,7 +651,7 @@ export function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '1.5rem',
+          padding: 'max(env(safe-area-inset-top, 48px), 48px) 1.5rem 1.5rem',
           zIndex: 1000
         }}>
           <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '440px', background: 'var(--bg-secondary)', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>

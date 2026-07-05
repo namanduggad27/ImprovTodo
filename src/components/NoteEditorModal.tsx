@@ -106,8 +106,8 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }}>
       {/* Top Navigation Bar */}
       <header style={{
-        height: '64px',
-        padding: '0 1rem',
+        minHeight: '64px',
+        padding: 'max(env(safe-area-inset-top, 48px), 48px) 1rem 0.75rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

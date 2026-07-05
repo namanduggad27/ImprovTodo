@@ -11,7 +11,7 @@ export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount }) =>
 
   return (
     <header className="header-container animate-fade-in" style={{
-      padding: '1.5rem 1rem 1rem',
+      padding: 'max(env(safe-area-inset-top, 48px), 48px) 1rem 1rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',

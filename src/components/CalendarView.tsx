@@ -3,6 +3,18 @@ import type { Todo } from '../types/todo';
 import { TodoCard } from './TodoCard';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Sparkles } from 'lucide-react';
 
+export function formatLocalDateStr(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function parseLocalDateStr(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 interface CalendarViewProps {
   todos: Todo[];
   onToggleTodo: (id: string) => void;
@@ -17,13 +29,13 @@ export function isTodoOnDate(todo: Todo, dateStr: string): boolean {
   if (todo.scheduleType === 'days') {
     if (todo.startDate && dateStr < todo.startDate) return false;
     if (todo.endDate && dateStr > todo.endDate) return false;
-    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+    const dayOfWeek = parseLocalDateStr(dateStr).getDay();
     return !!(todo.selectedDays && todo.selectedDays.includes(dayOfWeek));
   }
   if (todo.date) {
     return todo.date === dateStr;
   }
-  const createdDateStr = new Date(todo.createdAt).toISOString().split('T')[0];
+  const createdDateStr = formatLocalDateStr(new Date(todo.createdAt));
   return createdDateStr === dateStr;
 }
 
@@ -35,7 +47,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return formatLocalDateStr(new Date());
   });
 
   const year = currentDate.getFullYear();
@@ -52,7 +64,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const handleToday = () => {
     const today = new Date();
     setCurrentDate(today);
-    setSelectedDateStr(today.toISOString().split('T')[0]);
+    setSelectedDateStr(formatLocalDateStr(today));
   };
 
   // Calendar grid calculation
@@ -66,7 +78,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   for (let i = firstDayOfMonth - 1; i >= 0; i--) {
     const d = new Date(year, month - 1, prevMonthDays - i);
     days.push({
-      dateStr: d.toISOString().split('T')[0],
+      dateStr: formatLocalDateStr(d),
       dayNum: prevMonthDays - i,
       isCurrentMonth: false
     });
@@ -76,7 +88,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   for (let i = 1; i <= daysInMonth; i++) {
     const d = new Date(year, month, i);
     days.push({
-      dateStr: d.toISOString().split('T')[0],
+      dateStr: formatLocalDateStr(d),
       dayNum: i,
       isCurrentMonth: true
     });
@@ -87,21 +99,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   for (let i = 1; i <= remaining; i++) {
     const d = new Date(year, month + 1, i);
     days.push({
-      dateStr: d.toISOString().split('T')[0],
+      dateStr: formatLocalDateStr(d),
       dayNum: i,
       isCurrentMonth: false
     });
   }
 
   const selectedDateTodos = todos.filter(t => isTodoOnDate(t, selectedDateStr));
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatLocalDateStr(new Date());
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const selectedDateFormatted = new Date(selectedDateStr + 'T00:00:00').toLocaleDateString('en-US', {
+  const selectedDateFormatted = parseLocalDateStr(selectedDateStr).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric'
@@ -248,7 +260,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               className="btn btn-secondary"
               style={{ fontSize: '0.85rem' }}
             >
-              + Create Task for {new Date(selectedDateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              + Create Task for {parseLocalDateStr(selectedDateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </button>
           </div>
         ) : (

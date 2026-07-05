@@ -47,7 +47,7 @@ export const ImprovModal: React.FC<ImprovModalProps> = ({ isOpen, onClose, onAdd
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '1.5rem',
+      padding: 'max(env(safe-area-inset-top, 48px), 48px) 1.5rem 1.5rem',
       zIndex: 1000
     }}>
       <div className="glass-card animate-fade-in" style={{
