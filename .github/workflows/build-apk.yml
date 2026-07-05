@@ -1,0 +1,49 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows clicking "Run workflow" manually in GitHub tab
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Set up Java JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install Node Dependencies
+      run: npm ci || npm i
+
+    - name: Build Web Bundle & Sync Android Project
+      run: npm run build:android
+
+    - name: Grant Execute Permission for Gradle Wrapper
+      run: chmod +x android/gradlew
+
+    - name: Build Debug APK with Gradle
+      working-directory: ./android
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK as Downloadable Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ImprovTodo-Android-APK
+        path: android/app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 30
