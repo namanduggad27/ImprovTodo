@@ -1,19 +1,30 @@
 import React from 'react';
-import type { TabType } from '../types/todo';
+import type { TabType, AppSettings } from '../types/todo';
 import { CheckSquare, Calendar, Sparkles, BarChart2 } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  settings?: AppSettings;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
-  const navItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
+export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, settings }) => {
+  const allNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'todos', label: 'Tasks', icon: <CheckSquare size={22} /> },
     { id: 'calendar', label: 'Calendar', icon: <Calendar size={22} /> },
     { id: 'improv', label: 'Improv Studio', icon: <Sparkles size={22} /> },
     { id: 'stats', label: 'Progress', icon: <BarChart2 size={22} /> },
   ];
+
+  const navItems = allNavItems.filter(item => {
+    if (!settings) return true;
+    if (item.id === 'calendar' && !settings.enableRecurring) return false;
+    if (item.id === 'improv' && !settings.enableImprov) return false;
+    if (item.id === 'stats' && !settings.enableStats) return false;
+    return true;
+  });
+
+  if (navItems.length === 0) return null;
 
   return (
     <nav style={{
@@ -52,14 +63,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
               transition: 'all var(--transition-fast)',
               position: 'relative',
               padding: '0.5rem 0.75rem',
-              transform: isActive ? 'translateY(-2px)' : 'none'
+              transform: isActive ? 'translateY(-2px)' : 'none',
+              flex: 1
             }}
           >
             {item.icon}
             <span style={{
               fontSize: '0.75rem',
               fontWeight: isActive ? 600 : 400,
-              letterSpacing: '0.02em'
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap'
             }}>
               {item.label}
             </span>

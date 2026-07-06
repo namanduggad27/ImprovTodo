@@ -1,12 +1,13 @@
 import React from 'react';
-import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, Settings } from 'lucide-react';
 
 interface HeaderProps {
   completedCount: number;
   totalCount: number;
+  onOpenSettings?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount }) => {
+export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount, onOpenSettings }) => {
   const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
@@ -43,22 +44,48 @@ export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount }) =>
         </div>
       </div>
 
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        background: 'var(--bg-tertiary)',
-        padding: '0.4rem 0.75rem',
-        borderRadius: 'var(--radius-full)',
-        border: '1px solid var(--border-color)'
-      }}>
-        <CheckCircle2 size={16} color="var(--accent-primary)" />
-        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-          {completedCount}/{totalCount}
-        </span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          ({percentage}%)
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: 'var(--bg-tertiary)',
+          padding: '0.4rem 0.75rem',
+          borderRadius: 'var(--radius-full)',
+          border: '1px solid var(--border-color)'
+        }}>
+          <CheckCircle2 size={16} color="var(--accent-primary)" />
+          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+            {completedCount}/{totalCount}
+          </span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            ({percentage}%)
+          </span>
+        </div>
+
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            style={{
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-secondary)',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
+              flexShrink: 0
+            }}
+            title="Modular App Settings"
+            aria-label="Open Settings"
+          >
+            <Settings size={18} />
+          </button>
+        )}
       </div>
     </header>
   );

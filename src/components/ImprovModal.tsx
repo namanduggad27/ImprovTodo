@@ -1,30 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ImprovPrompt, Todo } from '../types/todo';
 import { IMPROV_PROMPTS } from '../data/improvPrompts';
-import { Sparkles, X, Shuffle, PlusCircle, Clock, Flame } from 'lucide-react';
+import { sound } from '../utils/audio';
+import { Sparkles, X, Shuffle, PlusCircle, Clock, Flame, Plus } from 'lucide-react';
 
 interface ImprovModalProps {
   isOpen: boolean;
+  prompts?: ImprovPrompt[];
   onClose: () => void;
   onAddAsTodo: (todoData: Omit<Todo, 'id' | 'createdAt' | 'completed'>) => void;
+  onOpenCustomModal?: () => void;
 }
 
-export const ImprovModal: React.FC<ImprovModalProps> = ({ isOpen, onClose, onAddAsTodo }) => {
-  const [currentPrompt, setCurrentPrompt] = useState<ImprovPrompt>(IMPROV_PROMPTS[0]);
+export const ImprovModal: React.FC<ImprovModalProps> = ({ isOpen, prompts = IMPROV_PROMPTS, onClose, onAddAsTodo, onOpenCustomModal }) => {
+  const [currentPrompt, setCurrentPrompt] = useState<ImprovPrompt>(prompts[0] || IMPROV_PROMPTS[0]);
   const [isSpinning, setIsSpinning] = useState(false);
+
+  useEffect(() => {
+    if (prompts && prompts.length > 0) {
+      setCurrentPrompt(prompts[0]);
+    }
+  }, [prompts]);
 
   if (!isOpen) return null;
 
   const handleSpin = () => {
     setIsSpinning(true);
+    sound.playTick();
     setTimeout(() => {
-      const randomIndex = Math.floor(Math.random() * IMPROV_PROMPTS.length);
-      setCurrentPrompt(IMPROV_PROMPTS[randomIndex]);
+      const activePrompts = prompts.length > 0 ? prompts : IMPROV_PROMPTS;
+      const randomIndex = Math.floor(Math.random() * activePrompts.length);
+      setCurrentPrompt(activePrompts[randomIndex]);
       setIsSpinning(false);
+      sound.playChime();
     }, 400);
   };
 
   const handleAdd = () => {
+    sound.playChime();
     onAddAsTodo({
       title: currentPrompt.title,
       description: currentPrompt.description,
@@ -101,22 +114,22 @@ export const ImprovModal: React.FC<ImprovModalProps> = ({ isOpen, onClose, onAdd
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span className="badge badge-improv">
-              <Sparkles size={12} style={{ marginRight: '4px' }} /> {currentPrompt.category}
+              <Sparkles size={12} style={{ marginRight: '4px' }} /> {currentPrompt?.category || 'creative'}
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <Clock size={12} /> {currentPrompt.timeEstimate}
+              <Clock size={12} /> {currentPrompt?.timeEstimate || '5 mins'}
             </span>
           </div>
 
           <h3 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-            {currentPrompt.title}
+            {currentPrompt?.title || 'Challenge'}
           </h3>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            {currentPrompt.description}
+            {currentPrompt?.description || 'Spin to get a challenge!'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
           <button
             onClick={handleSpin}
             className="btn btn-secondary"
@@ -132,6 +145,33 @@ export const ImprovModal: React.FC<ImprovModalProps> = ({ isOpen, onClose, onAdd
             <PlusCircle size={18} /> Add Task
           </button>
         </div>
+
+        {onOpenCustomModal && (
+          <button
+            onClick={() => {
+              onClose();
+              onOpenCustomModal();
+            }}
+            style={{
+              width: '100%',
+              padding: '0.6rem',
+              background: 'transparent',
+              border: '1px dashed var(--border-color)',
+              borderRadius: 'var(--radius-full)',
+              color: 'var(--text-secondary)',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <Plus size={14} /> Create Your Own Improv Idea
+          </button>
+        )}
       </div>
     </div>
   );

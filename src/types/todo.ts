@@ -49,3 +49,25 @@ export interface Note {
   color: NoteColor;
   updatedAt: number;
 }
+
+/* ==========================================================================
+   Modular App Settings
+   ========================================================================== */
+
+export interface AppSettings {
+  enableImprov: boolean;      // Improv Studio, Challenge Wheel, Improv Priority/Filters
+  enableNotes: boolean;       // Quick Notes & Google Keep Notebooks
+  enableRecurring: boolean;   // Recurring / Scheduled Tasks & Calendar View
+  enableSprintTimer: boolean; // ⚡ Sprint Timer button & Modal
+  enableStats: boolean;       // Progress & Stats tab
+  enableSound: boolean;       // Web Audio API ticks & fanfares
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  enableImprov: true,
+  enableNotes: true,
+  enableRecurring: true,
+  enableSprintTimer: true,
+  enableStats: true,
+  enableSound: true,
+};

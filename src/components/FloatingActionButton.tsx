@@ -3,7 +3,7 @@ import { Plus, Sparkles } from 'lucide-react';
 
 interface FloatingActionButtonProps {
   onClick: () => void;
-  onImprovClick: () => void;
+  onImprovClick?: () => void;
 }
 
 export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick, onImprovClick }) => {
@@ -18,27 +18,29 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onCl
       zIndex: 90,
       alignItems: 'flex-end'
     }}>
-      <button
-        onClick={onImprovClick}
-        style={{
-          width: '46px',
-          height: '46px',
-          borderRadius: 'var(--radius-full)',
-          background: 'linear-gradient(135deg, var(--accent-secondary), var(--accent-primary))',
-          color: 'white',
-          border: 'none',
-          boxShadow: '0 4px 15px var(--accent-secondary-glow)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'transform var(--transition-bounce)'
-        }}
-        aria-label="Open Improv Challenge"
-        title="Improv Challenge"
-      >
-        <Sparkles size={20} className="animate-pulse" />
-      </button>
+      {onImprovClick && (
+        <button
+          onClick={onImprovClick}
+          style={{
+            width: '46px',
+            height: '46px',
+            borderRadius: 'var(--radius-full)',
+            background: 'linear-gradient(135deg, var(--accent-secondary), var(--accent-primary))',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 4px 15px var(--accent-secondary-glow)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'transform var(--transition-bounce)'
+          }}
+          aria-label="Open Improv Challenge"
+          title="Improv Challenge"
+        >
+          <Sparkles size={20} className="animate-pulse" />
+        </button>
+      )}
 
       <button
         onClick={onClick}

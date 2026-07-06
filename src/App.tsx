@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import type { Todo, Priority, TabType, DateScheduleType, Note } from './types/todo';
+import type { Todo, Priority, TabType, DateScheduleType, Note, ImprovPrompt, AppSettings } from './types/todo';
+import { DEFAULT_APP_SETTINGS } from './types/todo';
 import { Header } from './components/Header';
 import { TodoCard } from './components/TodoCard';
 import { ImprovModal } from './components/ImprovModal';
+import { CustomImprovModal } from './components/CustomImprovModal';
+import { SprintTimerModal } from './components/SprintTimerModal';
+import { SettingsModal } from './components/SettingsModal';
 import { BottomNav } from './components/BottomNav';
 import { FloatingActionButton } from './components/FloatingActionButton';
 import { CalendarView, formatLocalDateStr } from './components/CalendarView';
 import { NoteCard } from './components/NoteCard';
 import { NoteEditorModal } from './components/NoteEditorModal';
 import { IMPROV_PROMPTS } from './data/improvPrompts';
-import { Sparkles, Filter, Flame, Trophy, CheckCircle2, Zap, Clock, Plus, Calendar as CalendarIcon, FileText } from 'lucide-react';
+import { sound } from './utils/audio';
+import { Sparkles, Filter, Flame, Trophy, CheckCircle2, Zap, Clock, Plus, Calendar as CalendarIcon, FileText, Trash2 } from 'lucide-react';
 import { App as CapApp } from '@capacitor/app';
 
 const INITIAL_TODOS: Todo[] = [
@@ -92,10 +97,31 @@ export function App() {
     return INITIAL_NOTES;
   });
 
+  const [customPrompts, setCustomPrompts] = useState<ImprovPrompt[]>(() => {
+    const saved = localStorage.getItem('improv_custom_prompts');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return [];
+  });
+
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('improv_settings');
+    if (saved) {
+      try { return { ...DEFAULT_APP_SETTINGS, ...JSON.parse(saved) }; } catch (e) { console.error(e); }
+    }
+    return DEFAULT_APP_SETTINGS;
+  });
+
   const [activeTab, setActiveTab] = useState<TabType>('todos');
   const [homeSection, setHomeSection] = useState<'daily' | 'scheduled' | 'notes'>('daily');
+  
+  // Modals
   const [isImprovModalOpen, setIsImprovModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeSprintTodo, setActiveSprintTodo] = useState<Todo | null>(null);
 
   // Separate Priority Filters for Section 1 and Section 2
   const [filterScheduled, setFilterScheduled] = useState<string>('all');
@@ -122,6 +148,8 @@ export function App() {
   });
   const [newSelectedDays, setNewSelectedDays] = useState<number[]>([1, 3, 5]); // Mon, Wed, Fri
 
+  const allImprovPrompts = [...customPrompts, ...IMPROV_PROMPTS];
+
   useEffect(() => {
     localStorage.setItem('improv_todos', JSON.stringify(todos));
   }, [todos]);
@@ -130,16 +158,44 @@ export function App() {
     localStorage.setItem('improv_notes', JSON.stringify(notes));
   }, [notes]);
 
+  useEffect(() => {
+    localStorage.setItem('improv_custom_prompts', JSON.stringify(customPrompts));
+  }, [customPrompts]);
+
+  useEffect(() => {
+    localStorage.setItem('improv_settings', JSON.stringify(appSettings));
+    sound.isMuted = !appSettings.enableSound;
+  }, [appSettings]);
+
+  // Fallback if current section or tab is disabled
+  useEffect(() => {
+    if (homeSection === 'scheduled' && !appSettings.enableRecurring) setHomeSection('daily');
+    if (homeSection === 'notes' && !appSettings.enableNotes) setHomeSection('daily');
+    if (activeTab === 'calendar' && !appSettings.enableRecurring) setActiveTab('todos');
+    if (activeTab === 'improv' && !appSettings.enableImprov) setActiveTab('todos');
+    if (activeTab === 'stats' && !appSettings.enableStats) setActiveTab('todos');
+  }, [appSettings, homeSection, activeTab]);
+
   // Native Android Hardware Back Button Handler
   useEffect(() => {
     const handleBackButton = async () => {
-      // 1. Close Full-Screen Note Editor / New Note Editor
+      if (isSettingsOpen) {
+        setIsSettingsOpen(false);
+        return;
+      }
+      if (activeSprintTodo) {
+        setActiveSprintTodo(null);
+        return;
+      }
+      if (isCustomModalOpen) {
+        setIsCustomModalOpen(false);
+        return;
+      }
       if (editingNote || isNoteEditorOpen) {
         setEditingNote(null);
         setIsNoteEditorOpen(false);
         return;
       }
-      // 2. Close Pop-up Modals
       if (isAddModalOpen) {
         setIsAddModalOpen(false);
         return;
@@ -148,23 +204,20 @@ export function App() {
         setIsImprovModalOpen(false);
         return;
       }
-      // 3. If on Tasks tab but in Recurring or Notes section -> Go back to Daily Tasks
       if (activeTab === 'todos' && homeSection !== 'daily') {
         setHomeSection('daily');
         return;
       }
-      // 4. If on Calendar, Improv Studio, or Stats tab -> Go back to Tasks tab
       if (activeTab !== 'todos') {
         setActiveTab('todos');
         return;
       }
-      // 5. If at the root (Tasks -> Daily), minimize app to background or exit
       try {
         await CapApp.minimizeApp();
-      } catch (e) {
+      } catch {
         try {
           await CapApp.exitApp();
-        } catch (err) {}
+        } catch {}
       }
     };
 
@@ -172,10 +225,23 @@ export function App() {
     return () => {
       handle.then(h => h.remove());
     };
-  }, [isAddModalOpen, isImprovModalOpen, isNoteEditorOpen, editingNote, activeTab, homeSection]);
+  }, [isAddModalOpen, isImprovModalOpen, isNoteEditorOpen, editingNote, activeTab, homeSection, activeSprintTodo, isCustomModalOpen, isSettingsOpen]);
 
   const handleToggleTodo = (id: string) => {
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+    setTodos(prev => prev.map(t => {
+      if (t.id === id) {
+        const nextCompleted = !t.completed;
+        if (nextCompleted) {
+          if (t.isImprovPrompt || t.priority === 'improv') {
+            sound.playVictoryFanfare();
+          } else {
+            sound.playTick();
+          }
+        }
+        return { ...t, completed: nextCompleted };
+      }
+      return t;
+    }));
   };
 
   const handleDeleteTodo = (id: string) => {
@@ -239,6 +305,19 @@ export function App() {
     setIsAddModalOpen(false);
   };
 
+  // Custom Improv Idea Handlers
+  const handleSaveCustomPrompt = (promptData: Omit<ImprovPrompt, 'id'>) => {
+    const newPrompt: ImprovPrompt = {
+      ...promptData,
+      id: 'custom-' + Math.random().toString(36).substring(2, 9)
+    };
+    setCustomPrompts(prev => [newPrompt, ...prev]);
+  };
+
+  const handleDeleteCustomPrompt = (id: string) => {
+    setCustomPrompts(prev => prev.filter(p => p.id !== id));
+  };
+
   // Notes Handlers
   const handleOpenNewNote = () => {
     setEditingNote(null);
@@ -289,9 +368,21 @@ export function App() {
       return t.priority === filterDaily;
     });
 
+  const availableSections = [
+    { id: 'daily', label: 'Daily Tasks', icon: <CheckCircle2 size={16} />, show: true },
+    { id: 'scheduled', label: 'Recurring', icon: <CalendarIcon size={16} />, show: appSettings.enableRecurring },
+    { id: 'notes', label: 'Quick Notes', icon: <FileText size={16} />, show: appSettings.enableNotes }
+  ].filter(sec => sec.show);
+
+  const filterOptions = ['all', 'high', 'medium', 'low', 'improv'].filter(f => f !== 'improv' || appSettings.enableImprov);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header completedCount={completedCount} totalCount={totalCount} />
+      <Header
+        completedCount={completedCount}
+        totalCount={totalCount}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
       <main style={{ padding: '1rem', flex: 1 }}>
         {/* TAB 1: HOME (WITH SECTION TOGGLE BUTTON BAR) */}
@@ -299,58 +390,56 @@ export function App() {
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
             {/* SEGMENTED CONTROL / SECTION TOGGLE BUTTON BAR */}
-            <div style={{
-              display: 'flex',
-              background: 'var(--bg-tertiary)',
-              padding: '5px',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid var(--border-color)',
-              gap: '4px',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-            }}>
-              {[
-                { id: 'daily', label: 'Daily Tasks', icon: <CheckCircle2 size={16} /> },
-                { id: 'scheduled', label: 'Recurring', icon: <CalendarIcon size={16} /> },
-                { id: 'notes', label: 'Quick Notes', icon: <FileText size={16} /> }
-              ].map(sec => (
-                <button
-                  key={sec.id}
-                  onClick={() => setHomeSection(sec.id as any)}
-                  style={{
-                    flex: 1,
-                    padding: '0.6rem 0.5rem',
-                    borderRadius: 'var(--radius-full)',
-                    border: 'none',
-                    background: homeSection === sec.id ? 'var(--bg-secondary)' : 'transparent',
-                    color: homeSection === sec.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                    fontWeight: homeSection === sec.id ? 700 : 500,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: homeSection === sec.id ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                    transition: 'all var(--transition-fast)'
-                  }}
-                >
-                  {sec.icon}
-                  <span style={{ whiteSpace: 'nowrap' }}>{sec.label}</span>
-                </button>
-              ))}
-            </div>
+            {availableSections.length > 1 && (
+              <div style={{
+                display: 'flex',
+                background: 'var(--bg-tertiary)',
+                padding: '5px',
+                borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--border-color)',
+                gap: '4px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              }}>
+                {availableSections.map(sec => (
+                  <button
+                    key={sec.id}
+                    onClick={() => setHomeSection(sec.id as any)}
+                    style={{
+                      flex: 1,
+                      padding: '0.6rem 0.5rem',
+                      borderRadius: 'var(--radius-full)',
+                      border: 'none',
+                      background: homeSection === sec.id ? 'var(--bg-secondary)' : 'transparent',
+                      color: homeSection === sec.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      fontWeight: homeSection === sec.id ? 700 : 500,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: homeSection === sec.id ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all var(--transition-fast)'
+                    }}
+                  >
+                    {sec.icon}
+                    <span style={{ whiteSpace: 'nowrap' }}>{sec.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* SUB-SECTION 1: DAILY TASKS */}
             {homeSection === 'daily' && (
               <div className="glass-card animate-fade-in" style={{ padding: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <CheckCircle2 color="var(--accent-secondary)" size={20} />
-                    <h2 style={{ fontSize: '1.15rem', margin: 0 }}>Normal Daily Tasks ({dailyTodos.length})</h2>
+                    <h2 style={{ fontSize: '1.15rem', margin: 0 }}>Daily Tasks ({dailyTodos.length})</h2>
                   </div>
-                  {/* Section 2 Filter Pills */}
+                  {/* Filter Pills */}
                   <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-                    {['all', 'high', 'medium', 'low', 'improv'].map(filter => (
+                    {filterOptions.map(filter => (
                       <button
                         key={filter}
                         onClick={() => setFilterDaily(filter)}
@@ -401,6 +490,8 @@ export function App() {
                         todo={todo}
                         onToggle={handleToggleTodo}
                         onDelete={handleDeleteTodo}
+                        onStartSprint={setActiveSprintTodo}
+                        showSprintButton={appSettings.enableSprintTimer}
                       />
                     ))}
                   </div>
@@ -409,16 +500,16 @@ export function App() {
             )}
 
             {/* SUB-SECTION 2: CALENDAR SCHEDULED & RECURRING TASKS */}
-            {homeSection === 'scheduled' && (
+            {homeSection === 'scheduled' && appSettings.enableRecurring && (
               <div className="glass-card animate-fade-in" style={{ padding: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <CalendarIcon color="var(--accent-primary)" size={20} />
                     <h2 style={{ fontSize: '1.15rem', margin: 0 }}>Calendar Recurring ({scheduledTodos.length})</h2>
                   </div>
-                  {/* Section 1 Filter Pills */}
+                  {/* Filter Pills */}
                   <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-                    {['all', 'high', 'medium', 'low', 'improv'].map(filter => (
+                    {filterOptions.map(filter => (
                       <button
                         key={filter}
                         onClick={() => setFilterScheduled(filter)}
@@ -469,6 +560,8 @@ export function App() {
                         todo={todo}
                         onToggle={handleToggleTodo}
                         onDelete={handleDeleteTodo}
+                        onStartSprint={setActiveSprintTodo}
+                        showSprintButton={appSettings.enableSprintTimer}
                       />
                     ))}
                   </div>
@@ -476,10 +569,10 @@ export function App() {
               </div>
             )}
 
-            {/* SUB-SECTION 3: QUICK NOTES & NOTEBOOKS (GOOGLE KEEP STYLE) */}
-            {homeSection === 'notes' && (
+            {/* SUB-SECTION 3: QUICK NOTES & NOTEBOOKS */}
+            {homeSection === 'notes' && appSettings.enableNotes && (
               <div className="glass-card animate-fade-in" style={{ padding: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <FileText color="hsl(40, 95%, 45%)" size={20} />
                     <h2 style={{ fontSize: '1.15rem', margin: 0 }}>Quick Notes & Lists ({notes.length})</h2>
@@ -526,7 +619,7 @@ export function App() {
         )}
 
         {/* TAB 2: CALENDAR VIEW */}
-        {activeTab === 'calendar' && (
+        {activeTab === 'calendar' && appSettings.enableRecurring && (
           <CalendarView
             todos={todos}
             onToggleTodo={handleToggleTodo}
@@ -536,7 +629,7 @@ export function App() {
         )}
 
         {/* TAB 3: IMPROV STUDIO */}
-        {activeTab === 'improv' && (
+        {activeTab === 'improv' && appSettings.enableImprov && (
           <div className="animate-fade-in">
             <div className="glass-card" style={{
               background: 'linear-gradient(135deg, hsla(210, 85%, 52%, 0.12), hsla(165, 70%, 42%, 0.1))',
@@ -550,56 +643,111 @@ export function App() {
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
                 Break creative blocks, beat procrastination, and turn tedious chores into games.
               </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setIsImprovModalOpen(true)}
+                  className="btn btn-improv"
+                  style={{ flex: 1, minWidth: '180px' }}
+                >
+                  <Sparkles size={18} /> Launch Challenge Wheel
+                </button>
+                <button
+                  onClick={() => setIsCustomModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, minWidth: '160px', background: 'var(--bg-secondary)' }}
+                >
+                  <Plus size={18} /> Create Your Idea
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyItems: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap size={18} color="var(--accent-secondary)" /> All Challenges ({allImprovPrompts.length})
+              </h3>
               <button
-                onClick={() => setIsImprovModalOpen(true)}
-                className="btn btn-improv"
-                style={{ width: '100%' }}
+                onClick={() => setIsCustomModalOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
               >
-                <Sparkles size={18} /> Launch Challenge Wheel
+                + Add New Idea
               </button>
             </div>
 
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Zap size={18} color="var(--accent-secondary)" /> All Challenges ({IMPROV_PROMPTS.length})
-            </h3>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {IMPROV_PROMPTS.map(prompt => (
-                <div key={prompt.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem', alignItems: 'center' }}>
-                      <span className="badge badge-improv">{prompt.category}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <Clock size={12} /> {prompt.timeEstimate}
-                      </span>
+              {allImprovPrompts.map(prompt => {
+                const isCustom = prompt.id.startsWith('custom-');
+                return (
+                  <div key={prompt.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', borderLeft: isCustom ? '4px solid var(--accent-secondary)' : undefined }}>
+                    <div style={{ textAlign: 'left', flex: 1 }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span className="badge badge-improv">{prompt.category}</span>
+                        {isCustom && (
+                          <span style={{ fontSize: '0.7rem', background: 'hsla(165, 70%, 42%, 0.15)', color: 'var(--accent-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-full)', fontWeight: 700 }}>
+                            Custom Idea
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Clock size={12} /> {prompt.timeEstimate}
+                        </span>
+                      </div>
+                      <h4 style={{ fontSize: '1rem', margin: '0 0 0.25rem' }}>{prompt.title}</h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{prompt.description}</p>
                     </div>
-                    <h4 style={{ fontSize: '1rem', margin: '0 0 0.25rem' }}>{prompt.title}</h4>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{prompt.description}</p>
+                    
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                      {isCustom && (
+                        <button
+                          onClick={() => handleDeleteCustomPrompt(prompt.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: 'var(--radius-sm)',
+                            transition: 'color var(--transition-fast)'
+                          }}
+                          title="Delete Custom Idea"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleAddTodo({
+                          title: prompt.title,
+                          description: prompt.description,
+                          priority: 'improv',
+                          category: prompt.category,
+                          isImprovPrompt: true,
+                          date: formatLocalDateStr(new Date()),
+                          scheduleType: 'single'
+                        })}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)' }}
+                        title="Add to Tasks Today"
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleAddTodo({
-                      title: prompt.title,
-                      description: prompt.description,
-                      priority: 'improv',
-                      category: prompt.category,
-                      isImprovPrompt: true,
-                      date: formatLocalDateStr(new Date()),
-                      scheduleType: 'single'
-                    })}
-                    className="btn btn-secondary"
-                    style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
-                    title="Add to Tasks Today"
-                  >
-                    <Plus size={20} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* TAB 4: STATS & PROGRESS */}
-        {activeTab === 'stats' && (
+        {activeTab === 'stats' && appSettings.enableStats && (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="glass-card" style={{ textAlign: 'center', padding: '1.5rem' }}>
               <Trophy size={44} color="hsl(40, 95%, 45%)" style={{ margin: '0 auto 0.5rem' }} />
@@ -628,13 +776,13 @@ export function App() {
 
             <div className="glass-card" style={{ background: 'var(--bg-tertiary)', textAlign: 'left' }}>
               <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Zap size={18} color="var(--accent-primary)" /> Home Page & Notes Tips
+                <Zap size={18} color="var(--accent-primary)" /> Modular Studio Tips
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0.5rem' }}>
-                • **Section Toggle Bar**: Use the button bar below the header to toggle between Daily Tasks, Recurring Tasks, and Quick Notes!
+                • **Customize Your Workspace**: Click the gear icon in the top right header at any time to toggle features like Improv Studio, Quick Notes, or Recurring Schedules!
               </p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                • **Google Keep Notebook**: Create color-coded text notes or interactive checklists for shopping, improv scripts, or brainstorming!
+                • **Touch Swiping**: Swipe any task right to complete or left to delete!
               </p>
             </div>
           </div>
@@ -657,7 +805,7 @@ export function App() {
           <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '440px', background: 'var(--bg-secondary)', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
               <CalendarIcon color="var(--accent-primary)" />
-              <h2 style={{ fontSize: '1.25rem', margin: 0, textAlign: 'left' }}>Add & Schedule Task</h2>
+              <h2 style={{ fontSize: '1.25rem', margin: 0, textAlign: 'left' }}>Add Task</h2>
             </div>
 
             <form onSubmit={handleCreateCustomTodo} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
@@ -697,33 +845,35 @@ export function App() {
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                   📅 Date & Schedule Options
                 </label>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '0.75rem' }}>
-                  {[
-                    { id: 'single', label: 'Single Date' },
-                    { id: 'range', label: 'Date Range' },
-                    { id: 'days', label: 'Specific Days' }
-                  ].map(mode => (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => setNewScheduleType(mode.id as any)}
-                      style={{
-                        flex: 1,
-                        padding: '0.5rem 0.25rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border-color)',
-                        background: newScheduleType === mode.id ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                        color: newScheduleType === mode.id ? 'white' : 'var(--text-secondary)',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)'
-                      }}
-                    >
-                      {mode.label}
-                    </button>
-                  ))}
-                </div>
+                {appSettings.enableRecurring ? (
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '0.75rem' }}>
+                    {[
+                      { id: 'single', label: 'Single Date' },
+                      { id: 'range', label: 'Date Range' },
+                      { id: 'days', label: 'Specific Days' }
+                    ].map(mode => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setNewScheduleType(mode.id as any)}
+                        style={{
+                          flex: 1,
+                          padding: '0.5rem 0.25rem',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)',
+                          background: newScheduleType === mode.id ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                          color: newScheduleType === mode.id ? 'white' : 'var(--text-secondary)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all var(--transition-fast)'
+                        }}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
                 {/* SINGLE DATE MODE */}
                 {newScheduleType === 'single' && (
@@ -743,7 +893,7 @@ export function App() {
                 )}
 
                 {/* RANGE & DAYS MODE */}
-                {(newScheduleType === 'range' || newScheduleType === 'days') && (
+                {(newScheduleType === 'range' || newScheduleType === 'days') && appSettings.enableRecurring && (
                   <div style={{ display: 'flex', gap: '0.5rem', marginBottom: newScheduleType === 'days' ? '0.75rem' : 0 }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Start Date</label>
@@ -775,7 +925,7 @@ export function App() {
                 )}
 
                 {/* SPECIFIC DAYS OF WEEK MODE */}
-                {newScheduleType === 'days' && (
+                {newScheduleType === 'days' && appSettings.enableRecurring && (
                   <div>
                     <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
                       Repeat on Days of Week
@@ -841,7 +991,7 @@ export function App() {
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
-                    <option value="improv">Improv Challenge</option>
+                    {appSettings.enableImprov && <option value="improv">Improv Challenge</option>}
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
@@ -865,7 +1015,7 @@ export function App() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-                  Save & Schedule
+                  Save Task
                 </button>
               </div>
             </form>
@@ -885,20 +1035,53 @@ export function App() {
       {/* Improv Challenge Wheel Modal */}
       <ImprovModal
         isOpen={isImprovModalOpen}
+        prompts={allImprovPrompts}
         onClose={() => setIsImprovModalOpen(false)}
         onAddAsTodo={handleAddTodo}
+        onOpenCustomModal={() => setIsCustomModalOpen(true)}
+      />
+
+      {/* Custom Improv Creator Modal */}
+      <CustomImprovModal
+        isOpen={isCustomModalOpen}
+        onClose={() => setIsCustomModalOpen(false)}
+        onSave={handleSaveCustomPrompt}
+      />
+
+      {/* Interactive Sprint Timer Modal */}
+      <SprintTimerModal
+        isOpen={!!activeSprintTodo}
+        todo={activeSprintTodo}
+        onClose={() => setActiveSprintTodo(null)}
+        onCompleteTodo={(id) => {
+          setTodos(prev => prev.map(t => {
+            if (t.id === id) {
+              return { ...t, completed: true };
+            }
+            return t;
+          }));
+        }}
+      />
+
+      {/* Modular Studio Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={appSettings}
+        onUpdateSettings={setAppSettings}
       />
 
       {/* Floating Action Button */}
       <FloatingActionButton
         onClick={() => setIsAddModalOpen(true)}
-        onImprovClick={() => setIsImprovModalOpen(true)}
+        onImprovClick={appSettings.enableImprov ? () => setIsImprovModalOpen(true) : undefined}
       />
 
       {/* Bottom Navigation */}
       <BottomNav
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        settings={appSettings}
       />
     </div>
   );
