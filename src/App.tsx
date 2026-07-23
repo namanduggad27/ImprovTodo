@@ -9,13 +9,15 @@ import { SprintTimerModal } from './components/SprintTimerModal';
 import { SettingsModal } from './components/SettingsModal';
 import { BottomNav } from './components/BottomNav';
 import { FloatingActionButton } from './components/FloatingActionButton';
-import { CalendarView, formatLocalDateStr } from './components/CalendarView';
+import { CalendarView } from './components/CalendarView';
+import { formatLocalDateStr } from './utils/date';
 import { NoteCard } from './components/NoteCard';
 import { NoteEditorModal } from './components/NoteEditorModal';
 import { IMPROV_PROMPTS } from './data/improvPrompts';
 import { sound } from './utils/audio';
 import { Sparkles, Filter, Flame, Trophy, CheckCircle2, Zap, Clock, Plus, Calendar as CalendarIcon, FileText, Trash2 } from 'lucide-react';
 import { App as CapApp } from '@capacitor/app';
+import { CapgoWidgetKit } from '@capgo/capacitor-widget-kit';
 
 const INITIAL_TODOS: Todo[] = [
   {
@@ -152,6 +154,22 @@ export function App() {
 
   useEffect(() => {
     localStorage.setItem('improv_todos', JSON.stringify(todos));
+    
+    // Sync to Widget Storage (all uncompleted tasks)
+    const syncWidget = async () => {
+      try {
+        const topTasks = todos.filter(t => !t.completed);
+        await CapgoWidgetKit.startWidgetSession({
+          widgetId: 'todo-widget-session',
+          kind: 'todo-list',
+          state: { tasks: topTasks },
+          metadata: {}
+        });
+      } catch (err) {
+        console.error('Widget sync failed:', err);
+      }
+    };
+    syncWidget();
   }, [todos]);
 
   useEffect(() => {

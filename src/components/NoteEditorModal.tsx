@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note, NoteItem, NoteColor } from '../types/todo';
-import { ChevronLeft, CheckSquare, FileText, Plus, Trash2, CheckCircle2, Circle, Palette, Save } from 'lucide-react';
+import { ChevronLeft, CheckSquare, FileText, Plus, Trash2, CheckCircle2, Circle, Palette } from 'lucide-react';
 
 interface NoteEditorModalProps {
   isOpen: boolean;
@@ -32,8 +32,16 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [items, setItems] = useState<NoteItem[]>([]);
   const [color, setColor] = useState<NoteColor>('default');
   const [newItemText, setNewItemText] = useState('');
+  const [savedFlash, setSavedFlash] = useState(false);
 
+  // Track whether this is the initial load (skip auto-save on mount)
+  const isInitialized = useRef(false);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset state when note or isOpen changes
   useEffect(() => {
+    isInitialized.current = false;
     if (note) {
       setTitle(note.title || '');
       setContent(note.content || '');
@@ -48,7 +56,52 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       setColor('default');
     }
     setNewItemText('');
+    // Allow auto-save to fire after this render cycle
+    const t = setTimeout(() => { isInitialized.current = true; }, 50);
+    return () => clearTimeout(t);
   }, [note, isOpen]);
+
+  const showSavedFlash = useCallback(() => {
+    setSavedFlash(true);
+    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 1500);
+  }, []);
+
+  const triggerSave = useCallback((
+    t: string, c: string, list: boolean, its: NoteItem[], col: NoteColor
+  ) => {
+    if (!isInitialized.current) return;
+    if (!t.trim() && !c.trim() && its.length === 0) return; // nothing to save
+    onSave({
+      title: t.trim() || 'Untitled Note',
+      content: c.trim(),
+      isList: list,
+      items: list ? its : undefined,
+      color: col
+    }, note?.id);
+    showSavedFlash();
+  }, [note?.id, onSave, showSavedFlash]);
+
+  // Debounced auto-save for text fields (title & content)
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      triggerSave(title, content, isList, items, color);
+    }, 500);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content]);
+
+  // Immediate save for structural changes (items, color, mode toggle)
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    triggerSave(title, content, isList, items, color);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, color, isList]);
 
   if (!isOpen) return null;
 
@@ -70,22 +123,6 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
   const handleDeleteItem = (itemId: string) => {
     setItems(prev => prev.filter(item => item.id !== itemId));
-  };
-
-  const handleSave = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!title.trim() && !content.trim() && items.length === 0) {
-      onClose();
-      return;
-    }
-    onSave({
-      title: title.trim() || 'Untitled Note',
-      content: content.trim(),
-      isList,
-      items: isList ? items : undefined,
-      color
-    }, note?.id);
-    onClose();
   };
 
   const activeColorObj = COLORS.find(c => c.id === color) || COLORS[0];
@@ -120,14 +157,14 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         zIndex: 10
       }}>
         <button
-          onClick={() => handleSave()}
+          onClick={onClose}
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '4px',
             color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem',
             padding: '0.5rem 0.25rem'
           }}
-          title="Save & Return"
+          title="Back to Notes"
         >
           <ChevronLeft size={24} color="var(--accent-primary)" />
           <span>Notes</span>
@@ -168,6 +205,21 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Auto-saved indicator */}
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            color: 'var(--accent-secondary)',
+            opacity: savedFlash ? 1 : 0,
+            transition: 'opacity 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            whiteSpace: 'nowrap'
+          }}>
+            <CheckCircle2 size={13} /> Saved
+          </span>
+
           {note && onDelete && (
             <button
               type="button"
@@ -182,18 +234,11 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
               <Trash2 size={18} />
             </button>
           )}
-          <button
-            onClick={() => handleSave()}
-            className="btn btn-primary"
-            style={{ padding: '0.45rem 0.95rem', fontSize: '0.85rem' }}
-          >
-            <Save size={16} /> Save
-          </button>
         </div>
       </header>
 
       {/* Main Full-Screen Content Area */}
-      <form onSubmit={handleSave} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1, gap: '1.25rem' }}>
+      <form onSubmit={e => e.preventDefault()} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1, gap: '1.25rem' }}>
         
         {/* Title Input */}
         <input
@@ -230,13 +275,13 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                   width: '32px', height: '32px', borderRadius: 'var(--radius-full)',
                   background: c.bgBtn,
                   border: color === c.id ? '2px solid var(--text-primary)' : '1px solid var(--border-color)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyItems: 'center',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: color === c.id ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
                   transition: 'transform var(--transition-fast)',
                   transform: color === c.id ? 'scale(1.1)' : 'scale(1)'
                 }}
               >
-                {color === c.id && <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-primary)', margin: 'auto' }} />}
+                {color === c.id && <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--text-primary)' }} />}
               </button>
             ))}
           </div>
