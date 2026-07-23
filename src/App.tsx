@@ -162,7 +162,7 @@ export function App() {
         await CapgoWidgetKit.startWidgetSession({
           widgetId: 'todo-widget-session',
           kind: 'todo-list',
-          state: { tasks: topTasks },
+          state: { tasks: topTasks as any },
           metadata: {}
         });
       } catch (err) {
