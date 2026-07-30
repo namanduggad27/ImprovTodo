@@ -37,6 +37,7 @@ export const ImprovModal: React.FC<ImprovModalProps> = ({ isOpen, prompts = IMPR
   };
 
   const handleAdd = () => {
+    if (!currentPrompt) return;
     sound.playChime();
     onAddAsTodo({
       title: currentPrompt.title,

@@ -3,16 +3,82 @@ package com.improvtodo.app;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Paint;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.StrikethroughSpan;
 import android.widget.RemoteViews;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class TodoWidgetProvider extends AppWidgetProvider {
+
+    public static final String ACTION_COMPLETE_TASK = "com.improvtodo.app.ACTION_COMPLETE_TASK";
+    public static final String EXTRA_TASK_ID = "task_id";
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        super.onReceive(context, intent);
+        if (ACTION_COMPLETE_TASK.equals(intent.getAction())) {
+            String taskId = intent.getStringExtra(EXTRA_TASK_ID);
+            if (taskId != null) {
+                try {
+                    // Update the boolean state for this task
+                    SharedPreferences capPrefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+                    String updatesStr = capPrefs.getString("widget_task_updates", "{}");
+                    JSONObject updates = new JSONObject(updatesStr);
+                    
+                    // Determine current state
+                    boolean isCurrentlyCompleted = false;
+                    SharedPreferences prefs = context.getSharedPreferences("capgo_widget_kit_templates_v1", Context.MODE_PRIVATE);
+                    String sessionData = prefs.getString("native-session:todo-widget-session", null);
+                    if (sessionData != null) {
+                        JSONObject session = new JSONObject(sessionData);
+                        JSONObject state = session.optJSONObject("state");
+                        if (state != null) {
+                            JSONArray tasks = state.optJSONArray("tasks");
+                            if (tasks != null) {
+                                for (int i = 0; i < tasks.length(); i++) {
+                                    JSONObject t = tasks.getJSONObject(i);
+                                    if (taskId.equals(t.optString("id"))) {
+                                        isCurrentlyCompleted = t.optBoolean("completed", false);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Apply any existing optimistic update override
+                    if (updates.has(taskId)) {
+                        isCurrentlyCompleted = updates.getBoolean(taskId);
+                    }
+                    
+                    // Toggle the state
+                    updates.put(taskId, !isCurrentlyCompleted);
+                    
+                    capPrefs.edit().putString("widget_task_updates", updates.toString()).apply();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                // Force update widget
+                AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+                ComponentName thisWidget = new ComponentName(context, TodoWidgetProvider.class);
+                int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
+                onUpdate(context, appWidgetManager, appWidgetIds);
+            }
+        }
+    }
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -23,11 +89,20 @@ public class TodoWidgetProvider extends AppWidgetProvider {
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_todo);
+        views.removeAllViews(R.id.widget_tasks_container);
 
         SharedPreferences prefs = context.getSharedPreferences("capgo_widget_kit_templates_v1", Context.MODE_PRIVATE);
         String sessionData = prefs.getString("native-session:todo-widget-session", null);
+        
+        SharedPreferences capPrefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+        String updatesStr = capPrefs.getString("widget_task_updates", "{}");
+        JSONObject updates = new JSONObject();
+        try {
+            updates = new JSONObject(updatesStr);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
 
-        StringBuilder tasksText = new StringBuilder();
         if (sessionData != null) {
             try {
                 JSONObject session = new JSONObject(sessionData);
@@ -35,29 +110,100 @@ public class TodoWidgetProvider extends AppWidgetProvider {
                 if (state != null) {
                     JSONArray tasks = state.optJSONArray("tasks");
                     if (tasks != null && tasks.length() > 0) {
+                        
+                        List<JSONObject> activeTasks = new ArrayList<>();
+                        List<JSONObject> doneTasks = new ArrayList<>();
+                        
                         for (int i = 0; i < tasks.length(); i++) {
                             JSONObject task = tasks.getJSONObject(i);
-                            tasksText.append("• ").append(task.optString("title", "Untitled")).append("\n");
+                            String id = task.optString("id");
+                            
+                            // Determine completion state (base state from app + optimistic update override)
+                            boolean isCompleted = task.optBoolean("completed", false);
+                            if (updates.has(id)) {
+                                isCompleted = updates.getBoolean(id);
+                            }
+                            
+                            if (isCompleted) {
+                                doneTasks.add(task);
+                            } else {
+                                activeTasks.add(task);
+                            }
                         }
+                        
+                        // Render Active Tasks
+                        for (JSONObject task : activeTasks) {
+                            views.addView(R.id.widget_tasks_container, createTaskView(context, task, false));
+                        }
+                        
+                        // Render Done Tasks
+                        if (!doneTasks.isEmpty()) {
+                            RemoteViews headerView = new RemoteViews(context.getPackageName(), R.layout.widget_section_header);
+                            views.addView(R.id.widget_tasks_container, headerView);
+                            
+                            for (JSONObject task : doneTasks) {
+                                views.addView(R.id.widget_tasks_container, createTaskView(context, task, true));
+                            }
+                        }
+                        
                     } else {
-                        tasksText.append("No active tasks! 🎉");
+                        RemoteViews emptyView = new RemoteViews(context.getPackageName(), R.layout.widget_task_item);
+                        emptyView.setTextViewText(R.id.widget_task_text, "No active tasks! 🎉");
+                        emptyView.setImageViewResource(R.id.widget_task_checkbox, android.R.drawable.ic_menu_today);
+                        views.addView(R.id.widget_tasks_container, emptyView);
                     }
                 }
             } catch (JSONException e) {
-                tasksText.append("Error loading tasks.");
                 e.printStackTrace();
             }
         } else {
-            tasksText.append("Open app to sync tasks.");
+            RemoteViews emptyView = new RemoteViews(context.getPackageName(), R.layout.widget_task_item);
+            emptyView.setTextViewText(R.id.widget_task_text, "Open app to sync tasks.");
+            emptyView.setImageViewResource(R.id.widget_task_checkbox, android.R.drawable.ic_popup_sync);
+            views.addView(R.id.widget_tasks_container, emptyView);
         }
 
-        views.setTextViewText(R.id.widget_tasks_text, tasksText.toString().trim());
-
-        // Intent to launch the app when the widget is clicked
+        // Intent to launch the app when the widget header is clicked
         Intent intent = new Intent(context, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        views.setOnClickPendingIntent(R.id.widget_container, pendingIntent);
+        views.setOnClickPendingIntent(R.id.widget_title, pendingIntent);
+        
+        // Intent to launch the input dialog when the add button is clicked
+        Intent addIntent = new Intent(context, WidgetInputActivity.class);
+        addIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent addPendingIntent = PendingIntent.getActivity(context, 1, addIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.widget_add_btn, addPendingIntent);
 
         appWidgetManager.updateAppWidget(appWidgetId, views);
+    }
+
+    private static RemoteViews createTaskView(Context context, JSONObject task, boolean isCompleted) {
+        RemoteViews rv = new RemoteViews(context.getPackageName(), R.layout.widget_task_item);
+        String title = task.optString("title", "Untitled");
+        String id = task.optString("id");
+        
+        if (isCompleted) {
+            SpannableString sp = new SpannableString(title);
+            sp.setSpan(new StrikethroughSpan(), 0, title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            rv.setTextViewText(R.id.widget_task_text, sp);
+            rv.setImageViewResource(R.id.widget_task_checkbox, android.R.drawable.checkbox_on_background);
+        } else {
+            rv.setTextViewText(R.id.widget_task_text, title);
+            rv.setImageViewResource(R.id.widget_task_checkbox, android.R.drawable.checkbox_off_background);
+        }
+        
+        // Set pending intent for ALL tasks to allow clicking to toggle completion
+        Intent completeIntent = new Intent(context, TodoWidgetProvider.class);
+        completeIntent.setAction(ACTION_COMPLETE_TASK);
+        completeIntent.putExtra(EXTRA_TASK_ID, id);
+        
+        // Generate a unique request code for each task to prevent PendingIntent override
+        int requestCode = id.hashCode();
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, requestCode, completeIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        
+        rv.setOnClickPendingIntent(R.id.widget_task_checkbox, pendingIntent);
+        rv.setOnClickPendingIntent(R.id.widget_task_row, pendingIntent);
+        
+        return rv;
     }
 }

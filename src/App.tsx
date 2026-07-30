@@ -10,7 +10,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { BottomNav } from './components/BottomNav';
 import { FloatingActionButton } from './components/FloatingActionButton';
 import { CalendarView } from './components/CalendarView';
-import { formatLocalDateStr } from './utils/date';
+import { formatLocalDateStr, isTodoOnDate } from './utils/date';
 import { NoteCard } from './components/NoteCard';
 import { NoteEditorModal } from './components/NoteEditorModal';
 import { IMPROV_PROMPTS } from './data/improvPrompts';
@@ -18,69 +18,12 @@ import { sound } from './utils/audio';
 import { Sparkles, Filter, Flame, Trophy, CheckCircle2, Zap, Clock, Plus, Calendar as CalendarIcon, FileText, Trash2 } from 'lucide-react';
 import { App as CapApp } from '@capacitor/app';
 import { CapgoWidgetKit } from '@capgo/capacitor-widget-kit';
+import { Preferences } from '@capacitor/preferences';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
-const INITIAL_TODOS: Todo[] = [
-  {
-    id: '1',
-    title: 'Weekly Improv Sprint Review',
-    description: 'Recurring review of completed challenges and improv goals every Mon, Wed, Fri.',
-    completed: false,
-    priority: 'high',
-    category: 'Recurring',
-    createdAt: Date.now() - 3600000,
-    startDate: formatLocalDateStr(new Date()),
-    endDate: formatLocalDateStr(new Date(Date.now() + 864000000)),
-    selectedDays: [1, 3, 5],
-    scheduleType: 'days'
-  },
-  {
-    id: '2',
-    title: 'Test Capacitor Mobile Build',
-    description: 'Run npx cap sync and open in Android Studio or Xcode to test native APIs.',
-    completed: false,
-    priority: 'high',
-    category: 'Development',
-    createdAt: Date.now() - 3600000,
-    date: new Date().toISOString().split('T')[0],
-    scheduleType: 'single'
-  },
-  {
-    id: '3',
-    title: 'The 2-Minute Sprint',
-    description: 'Pick the smallest annoying task on your list and finish it before a 120-second timer runs out.',
-    completed: true,
-    priority: 'improv',
-    category: 'quick-win',
-    isImprovPrompt: true,
-    createdAt: Date.now() - 7200000,
-    date: new Date().toISOString().split('T')[0],
-    scheduleType: 'single'
-  }
-];
+const INITIAL_TODOS: Todo[] = [];
 
-const INITIAL_NOTES: Note[] = [
-  {
-    id: 'note-1',
-    title: 'Improv Script Ideas',
-    content: '1. The elevator pitch challenge: explain a complex tech stack in 30 seconds to a medieval knight.\n2. Reverse psychology interview.',
-    isList: false,
-    color: 'blue',
-    updatedAt: Date.now() - 3600000
-  },
-  {
-    id: 'note-2',
-    title: 'Daily Micro-Wins Checklist',
-    content: '',
-    isList: true,
-    items: [
-      { id: 'item-1', text: 'Drink 500ml water first thing', completed: true },
-      { id: 'item-2', text: '2-minute desk stretch', completed: false },
-      { id: 'item-3', text: 'Clear downloads folder', completed: false }
-    ],
-    color: 'sage',
-    updatedAt: Date.now() - 7200000
-  }
-];
+const INITIAL_NOTES: Note[] = [];
 
 export function App() {
   const [todos, setTodos] = useState<Todo[]>(() => {
@@ -149,16 +92,21 @@ export function App() {
     return formatLocalDateStr(d);
   });
   const [newSelectedDays, setNewSelectedDays] = useState<number[]>([1, 3, 5]); // Mon, Wed, Fri
+  const [showScheduleOptions, setShowScheduleOptions] = useState(false);
+  const [newReminderTime, setNewReminderTime] = useState('');
 
   const allImprovPrompts = [...customPrompts, ...IMPROV_PROMPTS];
 
   useEffect(() => {
     localStorage.setItem('improv_todos', JSON.stringify(todos));
     
-    // Sync to Widget Storage (all uncompleted tasks)
+    // Sync to Widget Storage (today's tasks)
     const syncWidget = async () => {
       try {
-        const topTasks = todos.filter(t => !t.completed);
+        const todayStr = formatLocalDateStr(new Date());
+        const topTasks = todos
+          .filter(t => isTodoOnDate(t, todayStr))
+          .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
         await CapgoWidgetKit.startWidgetSession({
           widgetId: 'todo-widget-session',
           kind: 'todo-list',
@@ -171,6 +119,89 @@ export function App() {
     };
     syncWidget();
   }, [todos]);
+
+  // Request Notification Permissions on mount
+  useEffect(() => {
+    const initNotifications = async () => {
+      try {
+        await LocalNotifications.requestPermissions();
+      } catch (err) {
+        console.error('Notification perms error', err);
+      }
+    };
+    initNotifications();
+  }, []);
+
+  // Sync completed tasks from Widget (Polled for immediate updates on web/split-screen)
+  useEffect(() => {
+    const syncUpdatesFromWidget = async () => {
+      try {
+        const { value } = await Preferences.get({ key: 'widget_task_updates' });
+        if (value) {
+          const updates: Record<string, boolean> = JSON.parse(value);
+          const updateKeys = Object.keys(updates);
+          if (updateKeys.length > 0) {
+            setTodos(prev => {
+              let changed = false;
+              const next = prev.map(t => {
+                if (updateKeys.includes(t.id) && t.completed !== updates[t.id]) {
+                  changed = true;
+                  const nextCompleted = updates[t.id];
+                  if (nextCompleted && t.notificationId) {
+                    LocalNotifications.cancel({ notifications: [{ id: t.notificationId }] }).catch(console.error);
+                  }
+                  return { ...t, completed: nextCompleted, updatedAt: Date.now() };
+                }
+                return t;
+              });
+              return changed ? next : prev;
+            });
+            await Preferences.remove({ key: 'widget_task_updates' });
+          }
+        }
+
+        // Process new tasks created from widget
+        const newTasksPref = await Preferences.get({ key: 'widget_new_tasks' });
+        if (newTasksPref.value) {
+          const newTasks: string[] = JSON.parse(newTasksPref.value);
+          if (newTasks.length > 0) {
+            const todayStr = formatLocalDateStr(new Date());
+            const createdTodos: Todo[] = newTasks.map(title => ({
+              id: Math.random().toString(36).substring(2, 9),
+              title,
+              completed: false,
+              createdAt: Date.now(),
+              date: todayStr,
+              scheduleType: 'single',
+              priority: 'medium',
+              category: 'General'
+            }));
+            
+            setTodos(prev => [...createdTodos, ...prev]);
+            await Preferences.remove({ key: 'widget_new_tasks' });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync widget task updates', err);
+      }
+    };
+
+    syncUpdatesFromWidget();
+    
+    const interval = setInterval(syncUpdatesFromWidget, 1000);
+
+    // Also listen for app state changes to sync when returning from background
+    const listener = CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        syncUpdatesFromWidget();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      listener.then(l => l.remove());
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('improv_notes', JSON.stringify(notes));
@@ -255,23 +286,60 @@ export function App() {
           } else {
             sound.playTick();
           }
+          if (t.notificationId) {
+            LocalNotifications.cancel({ notifications: [{ id: t.notificationId }] }).catch(console.error);
+          }
         }
-        return { ...t, completed: nextCompleted };
+        return { ...t, completed: nextCompleted, updatedAt: Date.now() };
       }
       return t;
     }));
   };
 
   const handleDeleteTodo = (id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
+    setTodos(prev => {
+      const todo = prev.find(t => t.id === id);
+      if (todo?.notificationId) {
+        LocalNotifications.cancel({ notifications: [{ id: todo.notificationId }] }).catch(console.error);
+      }
+      return prev.filter(t => t.id !== id);
+    });
   };
 
-  const handleAddTodo = (todoData: Omit<Todo, 'id' | 'createdAt' | 'completed'>) => {
+  const handleAddTodo = async (todoData: Omit<Todo, 'id' | 'createdAt' | 'completed'>) => {
+    let notificationId: number | undefined;
+
+    if (todoData.reminderTime && todoData.date) {
+      notificationId = Math.floor(Math.random() * 1000000);
+      const [hours, minutes] = todoData.reminderTime.split(':').map(Number);
+      const scheduleDate = new Date(todoData.date);
+      scheduleDate.setHours(hours, minutes, 0, 0);
+
+      if (scheduleDate.getTime() > Date.now()) {
+        try {
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                id: notificationId,
+                title: 'Task Reminder',
+                body: todoData.title,
+                schedule: { at: scheduleDate },
+                smallIcon: 'ic_stat_icon_config_sample' // default capacitor icon
+              }
+            ]
+          });
+        } catch (e) {
+          console.error('Failed to schedule notification', e);
+        }
+      }
+    }
+
     const newTodo: Todo = {
       ...todoData,
       id: Math.random().toString(36).substring(2, 9),
       completed: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      notificationId
     };
     setTodos(prev => [newTodo, ...prev]);
   };
@@ -297,13 +365,15 @@ export function App() {
     if (newScheduleType === 'single') {
       handleAddTodo({
         ...baseData,
-        date: newDate
+        date: newDate,
+        reminderTime: newReminderTime || undefined
       });
     } else if (newScheduleType === 'range') {
       handleAddTodo({
         ...baseData,
         startDate: newStartDate,
-        endDate: newEndDate
+        endDate: newEndDate,
+        reminderTime: newReminderTime || undefined
       });
     } else if (newScheduleType === 'days') {
       if (newSelectedDays.length === 0) {
@@ -314,12 +384,14 @@ export function App() {
         ...baseData,
         startDate: newStartDate,
         endDate: newEndDate,
-        selectedDays: newSelectedDays
+        selectedDays: newSelectedDays,
+        reminderTime: newReminderTime || undefined
       });
     }
 
     setNewTitle('');
     setNewDesc('');
+    setNewReminderTime('');
     setIsAddModalOpen(false);
   };
 
@@ -347,16 +419,19 @@ export function App() {
     setIsNoteEditorOpen(true);
   };
 
-  const handleSaveNote = (noteData: Omit<Note, 'id' | 'updatedAt'>, existingId?: string) => {
+  const handleSaveNote = (noteData: Omit<Note, 'id' | 'updatedAt'>, existingId?: string): string => {
     if (existingId) {
       setNotes(prev => prev.map(n => n.id === existingId ? { ...n, ...noteData, updatedAt: Date.now() } : n));
+      return existingId;
     } else {
+      const newId = Math.random().toString(36).substring(2, 9);
       const newNote: Note = {
         ...noteData,
-        id: Math.random().toString(36).substring(2, 9),
+        id: newId,
         updatedAt: Date.now()
       };
       setNotes(prev => [newNote, ...prev]);
+      return newId;
     }
   };
 
@@ -860,138 +935,179 @@ export function App() {
 
               {/* SCHEDULING MODE SELECTOR */}
               <div style={{ background: 'var(--bg-tertiary)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
-                  📅 Date & Schedule Options
-                </label>
-                {appSettings.enableRecurring ? (
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '0.75rem' }}>
-                    {[
-                      { id: 'single', label: 'Single Date' },
-                      { id: 'range', label: 'Date Range' },
-                      { id: 'days', label: 'Specific Days' }
-                    ].map(mode => (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() => setNewScheduleType(mode.id as any)}
-                        style={{
-                          flex: 1,
-                          padding: '0.5rem 0.25rem',
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--border-color)',
-                          background: newScheduleType === mode.id ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                          color: newScheduleType === mode.id ? 'white' : 'var(--text-secondary)',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all var(--transition-fast)'
-                        }}
-                      >
-                        {mode.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleOptions(!showScheduleOptions)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '0',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}>
+                    📅 Date & Schedule Options
+                  </label>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {showScheduleOptions ? '▲' : '▼'}
+                  </span>
+                </button>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateRows: showScheduleOptions ? '1fr' : '0fr',
+                  transition: 'grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  marginTop: showScheduleOptions ? '12px' : '0',
+                }}>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div>
+                      {appSettings.enableRecurring ? (
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '0.75rem' }}>
+                          {[
+                            { id: 'single', label: 'Single Date' },
+                            { id: 'range', label: 'Date Range' },
+                            { id: 'days', label: 'Specific Days' }
+                          ].map(mode => (
+                            <button
+                              key={mode.id}
+                              type="button"
+                              onClick={() => setNewScheduleType(mode.id as any)}
+                              style={{
+                                flex: 1,
+                                padding: '0.5rem 0.25rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)',
+                                background: newScheduleType === mode.id ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                                color: newScheduleType === mode.id ? 'white' : 'var(--text-secondary)',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all var(--transition-fast)'
+                              }}
+                            >
+                              {mode.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
 
-                {/* SINGLE DATE MODE */}
-                {newScheduleType === 'single' && (
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Select Date</label>
-                    <input
-                      type="date"
-                      value={newDate}
-                      onChange={e => setNewDate(e.target.value)}
-                      style={{
-                        width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
-                        color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* RANGE & DAYS MODE */}
-                {(newScheduleType === 'range' || newScheduleType === 'days') && appSettings.enableRecurring && (
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: newScheduleType === 'days' ? '0.75rem' : 0 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Start Date</label>
-                      <input
-                        type="date"
-                        value={newStartDate}
-                        onChange={e => setNewStartDate(e.target.value)}
-                        style={{
-                          width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
-                          color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
-                        }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>End Date</label>
-                      <input
-                        type="date"
-                        value={newEndDate}
-                        onChange={e => setNewEndDate(e.target.value)}
-                        style={{
-                          width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
-                          color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* SPECIFIC DAYS OF WEEK MODE */}
-                {newScheduleType === 'days' && appSettings.enableRecurring && (
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                      Repeat on Days of Week
-                    </label>
-                    <div style={{ display: 'flex', gap: '4px', justifyItems: 'space-between' }}>
-                      {[
-                        { idx: 0, label: 'Su' },
-                        { idx: 1, label: 'Mo' },
-                        { idx: 2, label: 'Tu' },
-                        { idx: 3, label: 'We' },
-                        { idx: 4, label: 'Th' },
-                        { idx: 5, label: 'Fr' },
-                        { idx: 6, label: 'Sa' }
-                      ].map(day => {
-                        const isSelected = newSelectedDays.includes(day.idx);
-                        return (
-                          <button
-                            key={day.idx}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                setNewSelectedDays(prev => prev.filter(d => d !== day.idx));
-                              } else {
-                                setNewSelectedDays(prev => [...prev, day.idx]);
-                              }
-                            }}
+                      {/* SINGLE DATE MODE */}
+                      {newScheduleType === 'single' && (
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Select Date</label>
+                          <input
+                            type="date"
+                            value={newDate}
+                            onChange={e => setNewDate(e.target.value)}
                             style={{
-                              flex: 1,
-                              height: '34px',
-                              borderRadius: 'var(--radius-sm)',
-                              border: '1px solid var(--border-color)',
-                              background: isSelected ? 'var(--accent-secondary)' : 'var(--bg-secondary)',
-                              color: isSelected ? 'white' : 'var(--text-primary)',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
+                              width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+                              color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
                             }}
-                          >
-                            {day.label}
-                          </button>
-                        );
-                      })}
+                          />
+                        </div>
+                      )}
+
+                      {/* RANGE & DAYS MODE */}
+                      {(newScheduleType === 'range' || newScheduleType === 'days') && appSettings.enableRecurring && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: newScheduleType === 'days' ? '0.75rem' : 0 }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Start Date</label>
+                            <input
+                              type="date"
+                              value={newStartDate}
+                              onChange={e => setNewStartDate(e.target.value)}
+                              style={{
+                                width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
+                              }}
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>End Date</label>
+                            <input
+                              type="date"
+                              value={newEndDate}
+                              onChange={e => setNewEndDate(e.target.value)}
+                              style={{
+                                width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SPECIFIC DAYS OF WEEK MODE */}
+                      {newScheduleType === 'days' && appSettings.enableRecurring && (
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                            Repeat on Days of Week
+                          </label>
+                          <div style={{ display: 'flex', gap: '4px', justifyItems: 'space-between' }}>
+                            {[
+                              { idx: 0, label: 'Su' },
+                              { idx: 1, label: 'Mo' },
+                              { idx: 2, label: 'Tu' },
+                              { idx: 3, label: 'We' },
+                              { idx: 4, label: 'Th' },
+                              { idx: 5, label: 'Fr' },
+                              { idx: 6, label: 'Sa' }
+                            ].map(day => {
+                              const isSelected = newSelectedDays.includes(day.idx);
+                              return (
+                                <button
+                                  key={day.idx}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected && newSelectedDays.length > 1) {
+                                      setNewSelectedDays(prev => prev.filter(d => d !== day.idx));
+                                    } else if (!isSelected) {
+                                      setNewSelectedDays(prev => [...prev, day.idx].sort((a, b) => a - b));
+                                    }
+                                  }}
+                                  style={{
+                                    flex: 1, padding: '0.4rem 0', borderRadius: 'var(--radius-sm)',
+                                    border: '1px solid var(--border-color)',
+                                    background: isSelected ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                                    color: isSelected ? 'white' : 'var(--text-secondary)',
+                                    fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                                    transition: 'all var(--transition-fast)'
+                                  }}
+                                >
+                                  {day.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* REMINDER TIME */}
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                          Reminder Time (Optional)
+                        </label>
+                        <input
+                          type="time"
+                          value={newReminderTime}
+                          onChange={e => setNewReminderTime(e.target.value)}
+                          style={{
+                            width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none'
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem' }}>

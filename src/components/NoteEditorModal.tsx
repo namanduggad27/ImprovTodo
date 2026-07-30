@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note, NoteItem, NoteColor } from '../types/todo';
-import { ChevronLeft, CheckSquare, FileText, Plus, Trash2, CheckCircle2, Circle, Palette } from 'lucide-react';
-
+import { ChevronLeft, CheckSquare, FileText, Plus, Trash2, CheckCircle2, Circle, Palette, GripVertical } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 interface NoteEditorModalProps {
   isOpen: boolean;
   note: Note | null;
   onClose: () => void;
-  onSave: (noteData: Omit<Note, 'id' | 'updatedAt'>, existingId?: string) => void;
+  onSave: (noteData: Omit<Note, 'id' | 'updatedAt'>, existingId?: string) => string | void;
   onDelete?: (id: string) => void;
 }
 
@@ -18,6 +20,81 @@ const COLORS: { id: NoteColor; label: string; bgBtn: string; pageBg: string }[] 
   { id: 'lavender', label: 'Lavender', bgBtn: 'hsl(265, 75%, 85%)', pageBg: 'hsl(265, 70%, 96%)' },
   { id: 'pink', label: 'Rose Pink', bgBtn: 'hsl(340, 80%, 85%)', pageBg: 'hsl(340, 80%, 96%)' },
 ];
+
+interface SortableChecklistItemProps {
+  item: NoteItem;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onUpdateText: (id: string, text: string) => void;
+}
+
+const SortableChecklistItem: React.FC<SortableChecklistItemProps> = ({ item, onToggle, onDelete, onUpdateText }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        background: 'hsla(0, 0%, 100%, 0.6)',
+        padding: '0.75rem 1rem',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid hsla(220, 20%, 80%, 0.4)',
+        boxShadow: isDragging ? '0 5px 15px rgba(0,0,0,0.1)' : 'none',
+        ...style
+      }}
+    >
+      <div {...attributes} {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+        <GripVertical size={18} />
+      </div>
+      <button
+        type="button"
+        onClick={() => onToggle(item.id)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: item.completed ? 'var(--accent-secondary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+      >
+        {item.completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
+      </button>
+      <input
+        type="text"
+        value={item.text}
+        onChange={(e) => onUpdateText(item.id, e.target.value)}
+        style={{
+          flex: 1,
+          textDecoration: item.completed ? 'line-through' : 'none',
+          color: item.completed ? 'var(--text-muted)' : 'var(--text-primary)',
+          fontSize: '1rem',
+          fontWeight: 500,
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => onDelete(item.id)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex', alignItems: 'center' }}
+      >
+        <Trash2 size={18} />
+      </button>
+    </div>
+  );
+};
 
 export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   isOpen,
@@ -34,14 +111,42 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [newItemText, setNewItemText] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // allows clicking input without starting drag immediately
+      }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setItems((items) => {
+        const oldIndex = items.findIndex((i) => i.id === active.id);
+        const newIndex = items.findIndex((i) => i.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const handleUpdateItemText = (itemId: string, newText: string) => {
+    setItems(prev => prev.map(item => item.id === itemId ? { ...item, text: newText } : item));
+  };
+
   // Track whether this is the initial load (skip auto-save on mount)
   const isInitialized = useRef(false);
+  const activeNoteId = useRef<string | undefined>(note?.id);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset state when note or isOpen changes
   useEffect(() => {
     isInitialized.current = false;
+    activeNoteId.current = note?.id;
     if (note) {
       setTitle(note.title || '');
       setContent(note.content || '');
@@ -72,17 +177,23 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   ) => {
     if (!isInitialized.current) return;
     if (!t.trim() && !c.trim() && its.length === 0) return; // nothing to save
-    onSave({
+    
+    const savedId = onSave({
       title: t.trim() || 'Untitled Note',
       content: c.trim(),
       isList: list,
       items: list ? its : undefined,
       color: col
-    }, note?.id);
+    }, activeNoteId.current);
+    
+    if (savedId && !activeNoteId.current) {
+      activeNoteId.current = savedId;
+    }
+    
     showSavedFlash();
-  }, [note?.id, onSave, showSavedFlash]);
+  }, [onSave, showSavedFlash]);
 
-  // Debounced auto-save for text fields (title & content)
+  // Debounced auto-save for text fields (title & content) and items
   useEffect(() => {
     if (!isInitialized.current) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -93,15 +204,15 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content]);
+  }, [title, content, items]);
 
-  // Immediate save for structural changes (items, color, mode toggle)
+  // Immediate save for structural changes (color, mode toggle)
   useEffect(() => {
     if (!isInitialized.current) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     triggerSave(title, content, isList, items, color);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, color, isList]);
+  }, [color, isList]);
 
   if (!isOpen) return null;
 
@@ -315,45 +426,19 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                   No items in this list yet. Add your first item below!
                 </p>
               ) : (
-                items.map(item => (
-                  <div
-                    key={item.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      background: 'hsla(0, 0%, 100%, 0.6)',
-                      padding: '0.75rem 1rem',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid hsla(220, 20%, 80%, 0.4)',
-                      transition: 'all var(--transition-fast)'
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleToggleItem(item.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: item.completed ? 'var(--accent-secondary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
-                    >
-                      {item.completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
-                    </button>
-                    <span style={{
-                      flex: 1,
-                      textDecoration: item.completed ? 'line-through' : 'none',
-                      color: item.completed ? 'var(--text-muted)' : 'var(--text-primary)',
-                      fontSize: '1rem',
-                      fontWeight: 500
-                    }}>
-                      {item.text}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteItem(item.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex', alignItems: 'center' }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                    {items.map(item => (
+                      <SortableChecklistItem
+                        key={item.id}
+                        item={item}
+                        onToggle={handleToggleItem}
+                        onDelete={handleDeleteItem}
+                        onUpdateText={handleUpdateItemText}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
 

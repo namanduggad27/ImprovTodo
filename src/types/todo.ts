@@ -9,7 +9,10 @@ export interface Todo {
   priority: Priority;
   category: string;
   createdAt: number;
+  updatedAt?: number;
   isImprovPrompt?: boolean;
+  notificationId?: number;
+  reminderTime?: string; // HH:mm format
   // Scheduling fields
   date?: string; // YYYY-MM-DD
   startDate?: string; // YYYY-MM-DD

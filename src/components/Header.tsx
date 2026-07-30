@@ -1,5 +1,6 @@
 import React from 'react';
-import { Sparkles, CheckCircle2, Settings } from 'lucide-react';
+import { Sparkles, Settings } from 'lucide-react';
+import { CircularProgress } from './CircularProgress';
 
 interface HeaderProps {
   completedCount: number;
@@ -9,6 +10,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount, onOpenSettings }) => {
   const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const isComplete = totalCount > 0 && completedCount === totalCount;
 
   return (
     <header className="header-container animate-fade-in" style={{
@@ -44,24 +46,14 @@ export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount, onOp
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          background: 'var(--bg-tertiary)',
-          padding: '0.4rem 0.75rem',
-          borderRadius: 'var(--radius-full)',
-          border: '1px solid var(--border-color)'
-        }}>
-          <CheckCircle2 size={16} color="var(--accent-primary)" />
-          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-            {completedCount}/{totalCount}
-          </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            ({percentage}%)
-          </span>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        
+        {/* New Circular Progress Indicator */}
+        <CircularProgress 
+          percentage={percentage}
+          completedCount={completedCount}
+          totalCount={totalCount}
+        />
 
         {onOpenSettings && (
           <button
@@ -86,6 +78,25 @@ export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount, onOp
             <Settings size={18} />
           </button>
         )}
+      </div>
+
+      {/* Ambient Horizontal Progress Bar at the very bottom edge of Header */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'transparent',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${percentage}%`,
+          background: isComplete ? 'hsl(165, 70%, 42%)' : 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))',
+          transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease',
+          boxShadow: isComplete ? '0 0 8px hsl(165, 70%, 42%)' : 'none'
+        }} />
       </div>
     </header>
   );
