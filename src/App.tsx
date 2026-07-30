@@ -20,6 +20,7 @@ import { App as CapApp } from '@capacitor/app';
 import { CapgoWidgetKit } from '@capgo/capacitor-widget-kit';
 import { Preferences } from '@capacitor/preferences';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { autoBackup, checkForBackup } from './utils/backup';
 
 const INITIAL_TODOS: Todo[] = [];
 
@@ -96,6 +97,33 @@ export function App() {
   const [newReminderTime, setNewReminderTime] = useState('');
 
   const allImprovPrompts = [...customPrompts, ...IMPROV_PROMPTS];
+
+  // Auto-Restore from Persistent Backup on First Launch
+  useEffect(() => {
+    const runRestore = async () => {
+      const hasLocalData = localStorage.getItem('improv_todos') !== null;
+      if (!hasLocalData) {
+        const backup = await checkForBackup();
+        if (backup) {
+          if (backup.todos && Array.isArray(backup.todos)) setTodos(backup.todos);
+          if (backup.notes && Array.isArray(backup.notes)) setNotes(backup.notes);
+          if (backup.customPrompts && Array.isArray(backup.customPrompts)) setCustomPrompts(backup.customPrompts);
+          if (backup.appSettings) {
+            setAppSettings(prev => ({ ...prev, ...backup.appSettings }));
+          }
+        }
+      }
+    };
+    runRestore();
+  }, []);
+
+  // Debounced Auto-Backup to Persistent Storage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      autoBackup({ todos, notes, customPrompts, appSettings });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [todos, notes, customPrompts, appSettings]);
 
   useEffect(() => {
     localStorage.setItem('improv_todos', JSON.stringify(todos));
