@@ -21,21 +21,22 @@ export const GoalFilterStrip: React.FC<GoalFilterStripProps> = ({
   onOpenAdd
 }) => {
   const tabs: { status: GoalStatus; label: string; count: number }[] = [
-    { status: 'todo', label: 'To-dos', count: counts.todo },
-    { status: 'done', label: 'Done', count: counts.done },
-    { status: 'skipped', label: 'Skipped', count: counts.skipped }
+    { status: 'todo', label: 'TO-DOS', count: counts.todo },
+    { status: 'done', label: 'DONE', count: counts.done },
+    { status: 'skipped', label: 'SKIPPED', count: counts.skipped }
   ];
 
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      padding: '0.2rem 1rem 0.85rem',
-      userSelect: 'none'
+      justifyContent: 'space-between',
+      padding: '0.2rem 1rem 1rem',
+      userSelect: 'none',
+      gap: '8px'
     }}>
       {/* Segmented Filter Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
         {tabs.map(tab => {
           const isActive = activeStatus === tab.status;
           return (
@@ -46,32 +47,46 @@ export const GoalFilterStrip: React.FC<GoalFilterStripProps> = ({
                 onSelectStatus(tab.status);
               }}
               style={{
-                height: '36px',
+                height: '38px',
                 padding: '0 0.85rem',
-                borderRadius: '6px',
-                border: isActive ? '1.5px solid #121212' : '1.5px solid #1a1a1a',
-                background: isActive ? '#121212' : '#ffffff',
-                color: isActive ? '#ffffff' : '#1a1a1a',
-                fontSize: '0.85rem',
-                fontWeight: 700,
+                borderRadius: '4px',
+                border: isActive ? 'none' : '1px solid #222434',
+                background: isActive ? '#ffffff' : '#14151f',
+                color: isActive ? '#000000' : '#8b949e',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                letterSpacing: '0.04em',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '3px',
+                gap: '6px',
                 transition: 'all var(--transition-fast)',
-                boxShadow: isActive ? '0 2px 6px rgba(0,0,0,0.15)' : 'none'
+                boxShadow: isActive ? '0 2px 10px rgba(255,255,255,0.1)' : 'none'
               }}
             >
               <span>{tab.label}</span>
-              <sup style={{
-                fontSize: '0.65rem',
-                fontWeight: 800,
-                lineHeight: 1,
-                opacity: 0.9,
-                transform: 'translateY(-2px)'
-              }}>
-                {tab.count}
-              </sup>
+              {isActive ? (
+                <span style={{
+                  background: '#000000',
+                  color: '#ffffff',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  padding: '1px 5px',
+                  borderRadius: '2px',
+                  minWidth: '16px',
+                  textAlign: 'center'
+                }}>
+                  {tab.count}
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  color: '#8b949e'
+                }}>
+                  {tab.count}
+                </span>
+              )}
             </button>
           );
         })}
@@ -84,24 +99,24 @@ export const GoalFilterStrip: React.FC<GoalFilterStripProps> = ({
           onOpenAdd();
         }}
         style={{
-          marginLeft: 'auto',
-          width: '36px',
-          height: '36px',
-          borderRadius: '6px',
-          border: '1.5px solid #1a1a1a',
-          background: '#ffffff',
-          color: '#121212',
+          width: '38px',
+          height: '38px',
+          borderRadius: '4px',
+          border: '1px solid #222434',
+          background: '#14151f',
+          color: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           padding: 0,
+          flexShrink: 0,
           transition: 'transform var(--transition-fast)'
         }}
-        aria-label="Add New Goal"
-        title="Add New Goal"
+        title="Add Goal"
+        aria-label="Add Goal"
       >
-        <Plus size={20} strokeWidth={2.2} />
+        <Plus size={18} strokeWidth={2.4} />
       </button>
     </div>
   );

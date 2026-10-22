@@ -1,32 +1,32 @@
 /* ==========================================================================
    ImprovTodo Design System (Vanilla CSS)
-   Calm White Theme with Serene Accents, Glassmorphism & Touch Optimizations
+   Dark Stealth Cyber Theme with Vibrant Orange Accents
    ========================================================================== */
 
 :root {
-  /* Color Palette - Calm White & Soothing Pastels */
-  --bg-primary: hsl(210, 25%, 98%);
-  --bg-secondary: hsl(0, 0%, 100%);
-  --bg-tertiary: hsl(210, 20%, 94%);
-  --bg-card: hsla(0, 0%, 100%, 0.85);
-  --bg-glass: hsla(0, 0%, 100%, 0.85);
+  /* Color Palette - Cyber Dark & Vibrant Orange */
+  --bg-primary: #090a0e;
+  --bg-secondary: #111218;
+  --bg-tertiary: #161822;
+  --bg-card: #111218;
+  --bg-glass: rgba(17, 18, 24, 0.94);
   
-  --text-primary: hsl(220, 30%, 15%);
-  --text-secondary: hsl(220, 15%, 45%);
-  --text-muted: hsl(220, 10%, 65%);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   
-  --accent-primary: hsl(210, 85%, 52%); /* Serene Sky Blue */
-  --accent-primary-glow: hsla(210, 85%, 52%, 0.25);
-  --accent-secondary: hsl(165, 70%, 42%); /* Soothing Sage Green / Teal */
-  --accent-secondary-glow: hsla(165, 70%, 42%, 0.25);
+  --accent-primary: #ff5500; /* Vibrant Orange */
+  --accent-primary-glow: rgba(255, 85, 0, 0.35);
+  --accent-secondary: #ff5500;
+  --accent-secondary-glow: rgba(255, 85, 0, 0.25);
   
-  --priority-low: hsl(165, 70%, 40%);
-  --priority-medium: hsl(40, 95%, 45%);
-  --priority-high: hsl(350, 80%, 55%);
-  --priority-improv: hsl(250, 85%, 60%);
+  --priority-low: #10b981;
+  --priority-medium: #f59e0b;
+  --priority-high: #ef4444;
+  --priority-improv: #ff5500;
   
-  --border-color: hsla(220, 20%, 86%, 0.8);
-  --border-glow: hsla(210, 85%, 52%, 0.35);
+  --border-color: #1e202c;
+  --border-glow: rgba(255, 85, 0, 0.3);
   
   /* Typography */
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -34,10 +34,10 @@
   
   /* Layout & Spacing */
   --header-height: 70px;
-  --bottom-nav-height: 80px;
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
+  --bottom-nav-height: 75px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
   
   /* Animations */
@@ -74,10 +74,8 @@ html, body {
   max-width: 480px; /* Mobile Viewport Simulation on Desktop */
   margin: 0 auto;
   position: relative;
-  background: radial-gradient(circle at 50% 0%, hsla(210, 85%, 52%, 0.08) 0%, transparent 60%),
-              radial-gradient(circle at 80% 80%, hsla(165, 70%, 42%, 0.06) 0%, transparent 50%),
-              var(--bg-primary);
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.06);
+  background: #090a0e;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
   padding-bottom: var(--bottom-nav-height);
 }
 
