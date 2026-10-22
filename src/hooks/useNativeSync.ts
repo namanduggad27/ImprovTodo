@@ -214,6 +214,7 @@ export function useNativeSync({
   useEffect(() => {
     if (homeSection === 'scheduled' && !appSettings.enableRecurring) setHomeSection('daily');
     if (homeSection === 'notes' && !appSettings.enableNotes) setHomeSection('daily');
+    if (activeTab === 'goals' && !appSettings.enableGoals) setActiveTab('todos');
     if (activeTab === 'calendar' && !appSettings.enableRecurring) setActiveTab('todos');
     if (activeTab === 'improv' && !appSettings.enableImprov) setActiveTab('todos');
     if (activeTab === 'stats' && !appSettings.enableStats) setActiveTab('todos');

@@ -48,75 +48,15 @@ export function calculateChallengeDay(startDateStr?: string, totalDays: number =
   return Math.min(maxDays, Math.max(1, diffDays));
 }
 
-// 52 days prior to today so default initial state starts right at Day 53 / 66 as seen in mockup
-const defaultStartDate = new Date(Date.now() - 52 * 86400000).toISOString().split('T')[0];
-
 export const DEFAULT_GOAL_STATS: GoalChallengeStats = {
-  startDate: defaultStartDate,
+  startDate: new Date().toISOString().split('T')[0],
   totalChallengeDays: DEFAULT_CHALLENGE_DAYS,
-  currentDay: 53,
-  globalStreak: 53,
-  trophies: 4,
-  xpPoints: 4975,
+  currentDay: 1,
+  globalStreak: 0,
+  trophies: 0,
+  xpPoints: 0,
   activeDateStr: new Date().toISOString().split('T')[0]
 };
 
-export const INITIAL_GOAL_ITEMS: GoalItem[] = [
-  {
-    id: 'goal-1',
-    title: 'Drink 3L water',
-    frequency: 'Daily',
-    difficulty: 'Easy',
-    currentMetric: 0,
-    targetMetric: 2,
-    unit: 'L',
-    streakDays: 1,
-    status: 'todo',
-    bgPreset: 'water',
-    completedDates: [],
-    createdAt: Date.now() - 86400000 * 2
-  },
-  {
-    id: 'goal-2',
-    title: 'Workout 1h and 15min',
-    frequency: '6x/week',
-    difficulty: 'Easy',
-    currentMetric: 0,
-    targetMetric: 1.2,
-    unit: 'hrs',
-    streakDays: 14,
-    status: 'todo',
-    bgPreset: 'workout',
-    completedDates: [],
-    createdAt: Date.now() - 86400000 * 3
-  },
-  {
-    id: 'goal-3',
-    title: 'Run 2.8km',
-    frequency: '6x/week',
-    difficulty: 'Easy',
-    currentMetric: 0,
-    targetMetric: 2.8,
-    unit: 'km',
-    streakDays: 8,
-    status: 'todo',
-    bgPreset: 'running',
-    completedDates: [],
-    createdAt: Date.now() - 86400000 * 4
-  },
-  {
-    id: 'goal-4',
-    title: 'Scene Prompt Studio',
-    frequency: 'Daily',
-    difficulty: 'Focus',
-    currentMetric: 0,
-    targetMetric: 1,
-    unit: 'Session',
-    streakDays: 0,
-    status: 'todo',
-    bgPreset: 'mindset',
-    completedDates: [],
-    createdAt: Date.now() - 86400000 * 5,
-    isImprov: true
-  }
-];
+export const INITIAL_GOAL_ITEMS: GoalItem[] = [];
+

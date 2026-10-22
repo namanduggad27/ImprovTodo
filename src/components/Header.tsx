@@ -10,7 +10,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ completedCount, totalCount, onOpenSettings }) => {
   return (
     <header className="header-container animate-fade-in" style={{
-      padding: 'max(env(safe-area-inset-top, 40px), 40px) 1rem 0.85rem',
+      padding: 'max(env(safe-area-inset-top, 1rem), 1rem) 1rem 0.85rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',

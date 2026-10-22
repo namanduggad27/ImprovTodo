@@ -18,6 +18,17 @@ import { formatLocalDateStr } from './utils/date';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { useNativeSync } from './hooks/useNativeSync';
 
+// One-time automatic purge of legacy local data to ensure a completely fresh application
+const DATA_PURGE_KEY = 'improv_data_cleared_v1';
+if (typeof window !== 'undefined' && !localStorage.getItem(DATA_PURGE_KEY)) {
+  localStorage.removeItem('improv_todos');
+  localStorage.removeItem('improv_notes');
+  localStorage.removeItem('improv_custom_prompts');
+  localStorage.removeItem('improv_goals');
+  localStorage.removeItem('improv_goal_stats');
+  localStorage.setItem(DATA_PURGE_KEY, 'true');
+}
+
 const INITIAL_TODOS: Todo[] = [];
 const INITIAL_NOTES: Note[] = [];
 
