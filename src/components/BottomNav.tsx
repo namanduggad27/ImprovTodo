@@ -10,11 +10,11 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, settings }) => {
   const allNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'todos', label: 'Tasks', icon: <CheckSquare size={22} /> },
-    { id: 'goals', label: 'Goals', icon: <Target size={22} /> },
-    { id: 'calendar', label: 'Calendar', icon: <Calendar size={22} /> },
-    { id: 'improv', label: 'Improv Studio', icon: <Sparkles size={22} /> },
-    { id: 'stats', label: 'Progress', icon: <BarChart2 size={22} /> },
+    { id: 'todos', label: 'TASKS', icon: <CheckSquare size={20} /> },
+    { id: 'goals', label: 'GOALS', icon: <Target size={20} /> },
+    { id: 'calendar', label: 'CALENDAR', icon: <Calendar size={20} /> },
+    { id: 'improv', label: 'STUDIO', icon: <Sparkles size={20} /> },
+    { id: 'stats', label: 'PROGRESS', icon: <BarChart2 size={20} /> },
   ];
 
   const navItems = allNavItems.filter(item => {
@@ -35,14 +35,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, se
       left: 0,
       right: 0,
       height: 'var(--bottom-nav-height)',
-      background: 'var(--bg-glass)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      borderTop: '1px solid var(--border-color)',
+      background: '#090a0e',
+      borderTop: '1px solid #161822',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-around',
-      paddingBottom: 'env(safe-area-inset-bottom, 10px)',
+      paddingBottom: 'env(safe-area-inset-bottom, 8px)',
       zIndex: 100,
       maxWidth: '480px',
       margin: '0 auto'
@@ -62,20 +60,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, se
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '4px',
-              color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+              gap: '5px',
+              color: isActive ? '#ff5500' : '#64748b',
               transition: 'all var(--transition-fast)',
               position: 'relative',
-              padding: '0.5rem 0.75rem',
-              transform: isActive ? 'translateY(-2px)' : 'none',
+              padding: '0.6rem 0.5rem',
               flex: 1
             }}
           >
             {item.icon}
             <span style={{
-              fontSize: '0.75rem',
-              fontWeight: isActive ? 600 : 400,
-              letterSpacing: '0.02em',
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
               whiteSpace: 'nowrap'
             }}>
               {item.label}
@@ -84,11 +81,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, se
               <div style={{
                 position: 'absolute',
                 top: 0,
-                width: '24px',
-                height: '3px',
-                background: 'var(--accent-primary)',
-                borderRadius: 'var(--radius-full)',
-                boxShadow: '0 0 10px var(--accent-primary)'
+                width: '32px',
+                height: '2.5px',
+                background: '#ff5500',
+                borderRadius: '2px',
+                boxShadow: '0 0 8px rgba(255, 85, 0, 0.6)'
               }} />
             )}
           </button>

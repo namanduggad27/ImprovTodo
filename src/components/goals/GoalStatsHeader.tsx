@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Sparkles } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import type { GoalChallengeStats } from '../../types/goals';
 import { sound } from '../../utils/audio';
 
@@ -11,7 +11,7 @@ interface GoalStatsHeaderProps {
 export const GoalStatsHeader: React.FC<GoalStatsHeaderProps> = ({ stats, onOpenSettings }) => {
   return (
     <header style={{
-      padding: 'max(env(safe-area-inset-top, 44px), 44px) 1rem 0.4rem',
+      padding: 'max(env(safe-area-inset-top, 44px), 44px) 1rem 0.5rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -19,62 +19,60 @@ export const GoalStatsHeader: React.FC<GoalStatsHeaderProps> = ({ stats, onOpenS
     }}>
       {/* Gamification Stats Row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {/* Streak Pill */}
+        {/* Streak Pill [🔥 53] */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '5px',
-          background: '#f3efe6',
-          border: '1px solid rgba(0, 0, 0, 0.08)',
-          borderRadius: '100px',
+          gap: '6px',
+          background: '#14151f',
+          border: '1px solid rgba(255, 85, 0, 0.45)',
+          borderRadius: '4px',
           padding: '0.35rem 0.75rem',
-          fontSize: '0.88rem',
-          fontWeight: 800,
-          color: '#1a1a1a',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          fontSize: '0.85rem',
+          fontWeight: 900,
+          color: '#ff5500',
+          boxShadow: '0 2px 8px rgba(255, 85, 0, 0.15)'
         }}>
-          <span style={{ fontSize: '1rem' }} role="img" aria-label="streak">🔥</span>
-          <span>{stats.globalStreak}</span>
+          <span style={{ fontSize: '0.95rem' }} role="img" aria-label="streak">🔥</span>
+          <span style={{ color: '#ff5500', letterSpacing: '0.02em' }}>{stats.globalStreak}</span>
         </div>
 
-        {/* Trophies Pill */}
+        {/* Trophies Pill [🏆 4] */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '5px',
-          background: '#f3efe6',
-          border: '1px solid rgba(0, 0, 0, 0.08)',
-          borderRadius: '100px',
+          gap: '6px',
+          background: '#14151f',
+          border: '1px solid #222434',
+          borderRadius: '4px',
           padding: '0.35rem 0.75rem',
-          fontSize: '0.88rem',
-          fontWeight: 800,
-          color: '#1a1a1a',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          fontSize: '0.85rem',
+          fontWeight: 900,
+          color: '#ffffff'
         }}>
-          <span style={{ fontSize: '1rem' }} role="img" aria-label="trophies">🏆</span>
+          <span style={{ fontSize: '0.95rem' }} role="img" aria-label="trophies">🏆</span>
           <span>{stats.trophies}</span>
         </div>
 
-        {/* XP Points Pill */}
+        {/* XP Points Pill [+ 4,975] */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '5px',
-          background: '#f3efe6',
-          border: '1px solid rgba(0, 0, 0, 0.08)',
-          borderRadius: '100px',
+          background: '#14151f',
+          border: '1px solid #222434',
+          borderRadius: '4px',
           padding: '0.35rem 0.75rem',
-          fontSize: '0.88rem',
-          fontWeight: 800,
-          color: '#1a1a1a',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          fontSize: '0.85rem',
+          fontWeight: 900,
+          color: '#ffffff'
         }}>
-          <Sparkles size={15} color="#ea580c" />
+          <span style={{ color: '#ff5500', fontWeight: 900 }}>+</span>
           <span>{stats.xpPoints.toLocaleString()}</span>
         </div>
       </div>
 
-      {/* Settings Button */}
+      {/* Settings Button [⚙️] */}
       <button
         onClick={() => {
           sound.playPop();
@@ -83,14 +81,14 @@ export const GoalStatsHeader: React.FC<GoalStatsHeaderProps> = ({ stats, onOpenS
         style={{
           width: '36px',
           height: '36px',
-          borderRadius: '8px',
-          border: '1.5px solid #d4cebe',
-          background: '#f3efe6',
+          borderRadius: '4px',
+          border: '1px solid #222434',
+          background: '#14151f',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          color: '#1a1a1a',
+          color: '#94a3b8',
           transition: 'transform var(--transition-fast)'
         }}
         aria-label="Open Settings"
