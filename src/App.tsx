@@ -13,6 +13,7 @@ import { CalendarView } from './components/CalendarView';
 import { formatLocalDateStr, isTodoOnDate } from './utils/date';
 import { NoteCard } from './components/NoteCard';
 import { NoteEditorModal } from './components/NoteEditorModal';
+import { GoalsView } from './components/goals/GoalsView';
 import { IMPROV_PROMPTS } from './data/improvPrompts';
 import { sound } from './utils/audio';
 import { Sparkles, Filter, Flame, Trophy, CheckCircle2, Zap, Clock, Plus, Calendar as CalendarIcon, FileText, Trash2 } from 'lucide-react';
@@ -499,13 +500,15 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header
-        completedCount={completedCount}
-        totalCount={totalCount}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      {activeTab !== 'goals' && (
+        <Header
+          completedCount={completedCount}
+          totalCount={totalCount}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      )}
 
-      <main style={{ padding: '1rem', flex: 1 }}>
+      <main style={{ padding: activeTab === 'goals' ? '0' : '1rem', flex: 1 }}>
         {/* TAB 1: HOME (WITH SECTION TOGGLE BUTTON BAR) */}
         {activeTab === 'todos' && (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -737,6 +740,11 @@ export function App() {
             )}
 
           </div>
+        )}
+
+        {/* TAB: GOALS & 66-DAY HABIT CHALLENGE */}
+        {activeTab === 'goals' && appSettings.enableGoals && (
+          <GoalsView onOpenSettings={() => setIsSettingsOpen(true)} />
         )}
 
         {/* TAB 2: CALENDAR VIEW */}
@@ -1234,10 +1242,12 @@ export function App() {
       />
 
       {/* Floating Action Button */}
-      <FloatingActionButton
-        onClick={() => setIsAddModalOpen(true)}
-        onImprovClick={appSettings.enableImprov ? () => setIsImprovModalOpen(true) : undefined}
-      />
+      {activeTab !== 'goals' && (
+        <FloatingActionButton
+          onClick={() => setIsAddModalOpen(true)}
+          onImprovClick={appSettings.enableImprov ? () => setIsImprovModalOpen(true) : undefined}
+        />
+      )}
 
       {/* Bottom Navigation */}
       <BottomNav

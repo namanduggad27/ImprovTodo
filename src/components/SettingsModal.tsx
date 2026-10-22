@@ -1,7 +1,7 @@
 import React from 'react';
 import type { AppSettings } from '../types/todo';
 import { DEFAULT_APP_SETTINGS } from '../types/todo';
-import { X, Sparkles, FileText, Calendar, Zap, BarChart2, Volume2, RotateCcw, Sliders } from 'lucide-react';
+import { X, Sparkles, FileText, Calendar, Zap, BarChart2, Volume2, RotateCcw, Sliders, Target } from 'lucide-react';
 import { sound } from '../utils/audio';
 
 interface SettingsModalProps {
@@ -40,6 +40,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     icon: React.ReactNode;
     color: string;
   }[] = [
+    {
+      key: 'enableGoals',
+      title: 'Goals & 66-Day Habit Challenge',
+      description: 'Cinematic anime habit cards, streak tracker, XP sparks, and day navigators.',
+      icon: <Target size={20} />,
+      color: '#1a1a1a'
+    },
     {
       key: 'enableImprov',
       title: 'Improv Challenges & Studio',

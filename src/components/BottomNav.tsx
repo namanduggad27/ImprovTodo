@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TabType, AppSettings } from '../types/todo';
-import { CheckSquare, Calendar, Sparkles, BarChart2 } from 'lucide-react';
+import { CheckSquare, Target, Calendar, Sparkles, BarChart2 } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: TabType;
@@ -11,6 +11,7 @@ interface BottomNavProps {
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, settings }) => {
   const allNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'todos', label: 'Tasks', icon: <CheckSquare size={22} /> },
+    { id: 'goals', label: 'Goals', icon: <Target size={22} /> },
     { id: 'calendar', label: 'Calendar', icon: <Calendar size={22} /> },
     { id: 'improv', label: 'Improv Studio', icon: <Sparkles size={22} /> },
     { id: 'stats', label: 'Progress', icon: <BarChart2 size={22} /> },
@@ -18,6 +19,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, se
 
   const navItems = allNavItems.filter(item => {
     if (!settings) return true;
+    if (item.id === 'goals' && !settings.enableGoals) return false;
     if (item.id === 'calendar' && !settings.enableRecurring) return false;
     if (item.id === 'improv' && !settings.enableImprov) return false;
     if (item.id === 'stats' && !settings.enableStats) return false;
@@ -50,6 +52,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, se
         return (
           <button
             key={item.id}
+            id={`nav-tab-${item.id}`}
+            aria-label={item.label}
             onClick={() => onTabChange(item.id)}
             style={{
               background: 'none',

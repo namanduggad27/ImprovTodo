@@ -29,7 +29,7 @@ export interface ImprovPrompt {
   timeEstimate: string;
 }
 
-export type TabType = 'todos' | 'calendar' | 'improv' | 'stats';
+export type TabType = 'todos' | 'goals' | 'calendar' | 'improv' | 'stats';
 
 /* ==========================================================================
    Google Keep Style Notebook Types
@@ -58,6 +58,7 @@ export interface Note {
    ========================================================================== */
 
 export interface AppSettings {
+  enableGoals: boolean;       // 🎯 Goals & 66-Day Habit Challenge
   enableImprov: boolean;      // Improv Studio, Challenge Wheel, Improv Priority/Filters
   enableNotes: boolean;       // Quick Notes & Google Keep Notebooks
   enableRecurring: boolean;   // Recurring / Scheduled Tasks & Calendar View
@@ -67,6 +68,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  enableGoals: true,
   enableImprov: true,
   enableNotes: true,
   enableRecurring: true,

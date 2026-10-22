@@ -212,3 +212,23 @@ h1, h2, h3, h4, h5, h6 {
 .glass-card {
   touch-action: pan-y;
 }
+
+/* Goals Anime Card Utilities */
+.goal-card {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.goal-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.goal-delete-btn {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.goal-card:hover .goal-delete-btn {
+  opacity: 0.75;
+}
+
