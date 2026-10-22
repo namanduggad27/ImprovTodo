@@ -11,7 +11,7 @@ interface GoalStatsHeaderProps {
 export const GoalStatsHeader: React.FC<GoalStatsHeaderProps> = ({ stats, onOpenSettings }) => {
   return (
     <header style={{
-      padding: 'max(env(safe-area-inset-top, 44px), 44px) 1rem 0.5rem',
+      padding: 'max(env(safe-area-inset-top, 1rem), 1rem) 1rem 0.5rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',

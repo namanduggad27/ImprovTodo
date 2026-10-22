@@ -1,7 +1,7 @@
 import React from 'react';
 import type { AppSettings } from '../types/todo';
 import { DEFAULT_APP_SETTINGS } from '../types/todo';
-import { X, Sparkles, FileText, Calendar, Zap, BarChart2, Volume2, RotateCcw, Sliders, Target } from 'lucide-react';
+import { X, Sparkles, FileText, Calendar, Zap, BarChart2, Volume2, RotateCcw, Sliders, Target, Trash2 } from 'lucide-react';
 import { sound } from '../utils/audio';
 
 interface SettingsModalProps {
@@ -31,6 +31,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleReset = () => {
     sound.playChime();
     onUpdateSettings(DEFAULT_APP_SETTINGS);
+  };
+
+  const handleClearAllData = () => {
+    if (window.confirm('Are you sure you want to delete ALL local tasks, goals, notes, and progress?')) {
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
   const featureItems: {
@@ -228,22 +235,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Footer actions */}
-        <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="btn btn-secondary"
+              style={{ flex: 1, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <RotateCcw size={15} /> Reset Features
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-primary"
+              style={{ flex: 1, fontSize: '0.85rem' }}
+            >
+              Done & Apply
+            </button>
+          </div>
           <button
             type="button"
-            onClick={handleReset}
-            className="btn btn-secondary"
-            style={{ flex: 1, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            onClick={handleClearAllData}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '0.6rem',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              background: 'rgba(239, 68, 68, 0.08)',
+              color: '#ef4444',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              letterSpacing: '0.04em',
+              transition: 'all var(--transition-fast)'
+            }}
           >
-            <RotateCcw size={15} /> Reset All
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-primary"
-            style={{ flex: 1, fontSize: '0.85rem' }}
-          >
-            Done & Apply
+            <Trash2 size={14} /> CLEAR ALL LOCAL DATA
           </button>
         </div>
       </div>

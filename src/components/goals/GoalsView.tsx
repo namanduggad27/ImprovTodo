@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { GoalItem, GoalChallengeStats, GoalStatus } from '../../types/goals';
-import { INITIAL_GOAL_ITEMS, DEFAULT_GOAL_STATS, DEFAULT_CHALLENGE_DAYS, calculateChallengeDay } from '../../types/goals';
+import { DEFAULT_GOAL_STATS, DEFAULT_CHALLENGE_DAYS, calculateChallengeDay } from '../../types/goals';
 import { GoalStatsHeader } from './GoalStatsHeader';
 import { GoalDayTracker } from './GoalDayTracker';
 import { GoalFilterStrip } from './GoalFilterStrip';
@@ -21,14 +21,12 @@ export const GoalsView: React.FC<GoalsViewProps> = ({ onOpenSettings }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((g: any) => g.id));
-          const missingInitials = INITIAL_GOAL_ITEMS.filter(init => !existingIds.has(init.id));
-          return [...parsed, ...missingInitials];
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       } catch (e) { console.error(e); }
     }
-    return INITIAL_GOAL_ITEMS;
+    return [];
   });
 
   // Gamification & challenge stats with persistence
