@@ -5,6 +5,9 @@ import { sound } from '../../utils/audio';
 
 interface GoalCardProps {
   goal: GoalItem;
+  isDone?: boolean;
+  currentMetric?: number;
+  isEditable?: boolean;
   onToggleComplete: (id: string) => void;
   onDeleteGoal?: (id: string) => void;
   onIncrementProgress?: (id: string) => void;
@@ -12,10 +15,14 @@ interface GoalCardProps {
 
 export const GoalCard: React.FC<GoalCardProps> = ({
   goal,
+  isDone: customIsDone,
+  currentMetric: customMetric,
+  isEditable = true,
   onToggleComplete,
   onIncrementProgress
 }) => {
-  const isDone = goal.status === 'done';
+  const isDone = customIsDone !== undefined ? customIsDone : goal.status === 'done';
+  const displayMetric = customMetric !== undefined ? customMetric : goal.currentMetric;
 
   return (
     <div
@@ -80,6 +87,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({
         {/* Right Checkbox Button */}
         <button
           onClick={() => {
+            if (!isEditable) return; // Do not edit after cutoff
             if (isDone) {
               sound.playPop();
             } else {
@@ -87,6 +95,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({
             }
             onToggleComplete(goal.id);
           }}
+          disabled={!isEditable}
           style={{
             width: '36px',
             height: '36px',
@@ -97,13 +106,14 @@ export const GoalCard: React.FC<GoalCardProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer',
+            cursor: isEditable ? 'pointer' : 'default',
             padding: 0,
             boxShadow: isDone ? '0 0 12px rgba(255, 85, 0, 0.5)' : 'none',
-            transition: 'all var(--transition-fast)'
+            transition: 'all var(--transition-fast)',
+            opacity: isEditable ? 1 : 0.65
           }}
-          aria-label={isDone ? 'Mark uncompleted' : 'Mark completed'}
-          title={isDone ? 'Completed' : 'Click to complete'}
+          aria-label={isDone ? 'Completed' : 'To-do'}
+          title={isDone ? 'Completed' : isEditable ? 'Click to complete' : 'Past task'}
         >
           <Check size={18} strokeWidth={2.6} color={isDone ? '#ffffff' : '#64748b'} />
         </button>
@@ -168,24 +178,27 @@ export const GoalCard: React.FC<GoalCardProps> = ({
         {/* Progress Metric */}
         <button
           onClick={() => {
+            if (!isEditable) return; // Do not edit after cutoff
             if (onIncrementProgress) {
               sound.playPop();
               onIncrementProgress(goal.id);
             }
           }}
+          disabled={!isEditable}
           style={{
             background: 'none',
             border: 'none',
             padding: 0,
-            color: '#ffffff',
+            color: isDone ? '#64748b' : '#ffffff',
             fontSize: '0.78rem',
             fontWeight: 900,
-            cursor: 'pointer',
-            letterSpacing: '0.02em'
+            cursor: isEditable ? 'pointer' : 'default',
+            letterSpacing: '0.02em',
+            opacity: isEditable ? 1 : 0.7
           }}
-          title="Click to increment progress"
+          title={isEditable ? 'Click to increment progress' : 'Progress'}
         >
-          {goal.currentMetric} / {goal.targetMetric}{goal.unit}
+          {displayMetric} / {goal.targetMetric}{goal.unit}
         </button>
       </div>
     </div>

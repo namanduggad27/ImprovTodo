@@ -7,6 +7,8 @@ export interface AppBackupData {
   notes: any[];
   customPrompts: any[];
   appSettings: any;
+  goals?: any[];
+  goalStats?: any;
 }
 
 /**
