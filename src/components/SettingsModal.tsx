@@ -47,56 +47,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     icon: React.ReactNode;
     color: string;
   }[] = [
-    {
-      key: 'enableGoals',
-      title: 'Goals & 66-Day Habit Challenge',
-      description: 'Cinematic anime habit cards, streak tracker, XP sparks, and day navigators.',
-      icon: <Target size={20} />,
-      color: '#1a1a1a'
-    },
-    {
-      key: 'enableImprov',
-      title: 'Improv Challenges & Studio',
-      description: 'Challenge Wheel, creative unlocks, custom ideas, and Improv filters.',
-      icon: <Sparkles size={20} />,
-      color: 'var(--accent-primary)'
-    },
-    {
-      key: 'enableNotes',
-      title: 'Quick Notes & Notebooks',
-      description: 'Google Keep style color-coded notes and interactive checklists.',
-      icon: <FileText size={20} />,
-      color: 'hsl(40, 95%, 45%)'
-    },
-    {
-      key: 'enableRecurring',
-      title: 'Calendar & Recurring Tasks',
-      description: 'Recurring day schedules, date ranges, and full monthly calendar tab.',
-      icon: <Calendar size={20} />,
-      color: 'var(--accent-secondary)'
-    },
-    {
-      key: 'enableSprintTimer',
-      title: '2-Minute Sprint Timer',
-      description: 'Interactive countdown sprint button on uncompleted task cards.',
-      icon: <Zap size={20} />,
-      color: 'hsl(280, 80%, 60%)'
-    },
-    {
-      key: 'enableStats',
-      title: 'Progress & Analytics',
-      description: 'Overall completion rates, win counters, and productivity tips tab.',
-      icon: <BarChart2 size={20} />,
-      color: 'hsl(210, 85%, 52%)'
-    },
-    {
-      key: 'enableSound',
-      title: 'Web Audio Sound Effects',
-      description: 'Zero-dependency lofi ticks, chimes, and victory fanfares.',
-      icon: <Volume2 size={20} />,
-      color: 'hsl(165, 70%, 42%)'
-    }
-  ];
+      {
+        key: 'enableGoals',
+        title: 'Goals & 66-Day Habit Challenge',
+        description: 'Cinematic anime habit cards, streak tracker, XP sparks, and day navigators.',
+        icon: <Target size={20} />,
+        color: '#1a1a1a'
+      },
+      {
+        key: 'enableImprov',
+        title: 'Improv Challenges & Studio',
+        description: 'Challenge Wheel, creative unlocks, custom ideas, and Improv filters.',
+        icon: <Sparkles size={20} />,
+        color: 'var(--accent-primary)'
+      },
+      {
+        key: 'enableNotes',
+        title: 'Quick Notes & Notebooks',
+        description: 'Google Keep style color-coded notes and interactive checklists.',
+        icon: <FileText size={20} />,
+        color: 'hsl(40, 95%, 45%)'
+      },
+      {
+        key: 'enableRecurring',
+        title: 'Calendar & Recurring Tasks',
+        description: 'Recurring day schedules, date ranges, and full monthly calendar tab.',
+        icon: <Calendar size={20} />,
+        color: 'var(--accent-secondary)'
+      },
+      {
+        key: 'enableSprintTimer',
+        title: '2-Minute Sprint Timer',
+        description: 'Interactive countdown sprint button on uncompleted task cards.',
+        icon: <Zap size={20} />,
+        color: 'hsl(280, 80%, 60%)'
+      },
+      {
+        key: 'enableStats',
+        title: 'Progress & Analytics',
+        description: 'Overall completion rates, win counters, and productivity tips tab.',
+        icon: <BarChart2 size={20} />,
+        color: 'hsl(210, 85%, 52%)'
+      },
+      {
+        key: 'enableSound',
+        title: 'Web Audio Sound Effects',
+        description: 'Zero-dependency lofi ticks, chimes, and victory fanfares.',
+        icon: <Volume2 size={20} />,
+        color: 'hsl(165, 70%, 42%)'
+      }
+    ];
 
   return (
     <div style={{

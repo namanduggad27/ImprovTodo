@@ -67,7 +67,7 @@ export function App() {
 
   const [activeTab, setActiveTab] = useState<TabType>('todos');
   const [homeSection, setHomeSection] = useState<'daily' | 'scheduled' | 'notes'>('daily');
-  
+
   // Modals
   const [isImprovModalOpen, setIsImprovModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

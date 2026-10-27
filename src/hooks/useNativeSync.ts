@@ -79,6 +79,12 @@ export function useNativeSync({
           if (backup.appSettings) {
             setAppSettings(prev => ({ ...prev, ...backup.appSettings }));
           }
+          if (backup.goals && Array.isArray(backup.goals)) {
+            try { localStorage.setItem('improv_goals', JSON.stringify(backup.goals)); } catch (e) {}
+          }
+          if (backup.goalStats) {
+            try { localStorage.setItem('improv_goal_stats', JSON.stringify(backup.goalStats)); } catch (e) {}
+          }
         }
       }
     };
@@ -88,7 +94,16 @@ export function useNativeSync({
   // Debounced Auto-Backup to Persistent Storage
   useEffect(() => {
     const timer = setTimeout(() => {
-      autoBackup({ todos, notes, customPrompts, appSettings });
+      let goals = [];
+      let goalStats = undefined;
+      try {
+        const savedG = localStorage.getItem('improv_goals');
+        if (savedG) goals = JSON.parse(savedG);
+        const savedS = localStorage.getItem('improv_goal_stats');
+        if (savedS) goalStats = JSON.parse(savedS);
+      } catch (e) {}
+
+      autoBackup({ todos, notes, customPrompts, appSettings, goals, goalStats });
     }, 2000);
     return () => clearTimeout(timer);
   }, [todos, notes, customPrompts, appSettings]);

@@ -68,7 +68,11 @@ public class WidgetInputActivity extends Activity {
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
             ComponentName thisWidget = new ComponentName(this, TodoWidgetProvider.class);
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
-            TodoWidgetProvider.updateAppWidget(this, appWidgetManager, appWidgetIds[0]);
+            if (appWidgetIds != null && appWidgetIds.length > 0) {
+                for (int id : appWidgetIds) {
+                    TodoWidgetProvider.updateAppWidget(this, appWidgetManager, id);
+                }
+            }
             
         } catch (JSONException e) {
             e.printStackTrace();
